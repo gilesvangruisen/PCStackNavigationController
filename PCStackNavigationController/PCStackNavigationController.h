@@ -20,6 +20,9 @@
 
 @property (nonatomic, strong) id<PCStackNavigationControllerDelegate> delegate;
 
+@property (nonatomic, assign) CGFloat rootViewControllerUpperBound;
+@property (nonatomic, assign) CGFloat rootViewControllerLowerBound;
+
 - (id)initWithRootViewController:(UIViewController *)rootViewController;
 
 @end
