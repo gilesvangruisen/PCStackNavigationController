@@ -14,8 +14,9 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-    
-    PCStackNavigationController *stackNav = [[PCStackNavigationController alloc] init];
+    UIViewController *rootViewController = [[UIViewController alloc] init];
+    rootViewController.view.backgroundColor = [UIColor grayColor];
+    PCStackNavigationController *stackNav = [[PCStackNavigationController alloc] initWithRootViewController:rootViewController];
     self.window.rootViewController = stackNav;
     self.window.backgroundColor = [UIColor whiteColor];
     [self.window makeKeyAndVisible];

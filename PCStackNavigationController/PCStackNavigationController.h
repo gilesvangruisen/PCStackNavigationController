@@ -20,6 +20,8 @@
 
 @property (nonatomic, strong) id<PCStackNavigationControllerDelegate> delegate;
 
+- (id)initWithRootViewController:(UIViewController *)rootViewController;
+
 @end
 
 @protocol PCStackNavigationControllerDelegate <NSObject>

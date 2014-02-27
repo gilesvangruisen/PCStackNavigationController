@@ -31,7 +31,7 @@ CGPoint originalCen;
         // Start watching for pan gestures
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
         [self.view addGestureRecognizer:panGestureRecognizer];
-        
+        [self.view addSubview:rootViewController.view];
         [self.viewControllers addObject:rootViewController];
         self.visibleViewController = rootViewController;
         panGestureRecognizer.delegate = self;
@@ -39,10 +39,18 @@ CGPoint originalCen;
     return self;
 }
 
+- (void)setBottomViewController:(UIViewController *)bottomViewController {
+    if (!bottomViewController)
+        return;
+    self.bottomViewController = bottomViewController;
+    [self.view insertSubview:self.bottomViewController.view atIndex:0];
+    [self.viewControllers insertObject:self.bottomViewController atIndex:0];
+}
+
 #pragma mark pan gesture
 
 - (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture {
-    
+
 }
 
 #pragma mark etc.
