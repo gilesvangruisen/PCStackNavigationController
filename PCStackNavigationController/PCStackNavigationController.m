@@ -18,12 +18,15 @@
 
 #pragma mark initialization
 
+@synthesize bottomViewController = _bottomViewController;
+
 float velocity;
 float lastTouchY;
-BOOL sliding;
-BOOL rootVisible;
-CGPoint originalLoc;
-CGPoint originalCen;
+bool sliding;
+bool rootViewControllerVisible;
+bool bottomViewControllerVisible;
+CGPoint originalPosition;
+CGPoint originalCenter;
 
 - (id)initWithRootViewController:(UIViewController *)rootViewController {
     self = [super init];
@@ -40,31 +43,48 @@ CGPoint originalCen;
 }
 
 - (void)setBottomViewController:(UIViewController *)bottomViewController {
-    if (!bottomViewController)
-        return;
-    self.bottomViewController = bottomViewController;
-    [self.view insertSubview:self.bottomViewController.view atIndex:0];
-    [self.viewControllers insertObject:self.bottomViewController atIndex:0];
+    _bottomViewController = bottomViewController ? bottomViewController : nil;
+
+    _bottomViewController = bottomViewController;
+    [self.view insertSubview:_bottomViewController.view atIndex:0];
+    [self.viewControllers insertObject:_bottomViewController atIndex:0];
 }
 
-#pragma mark pan gesture
+#pragma mark Animations
+
+- (void)centerView:(UIView *)view onGesture:(UIPanGestureRecognizer *)gesture {
+    CGPoint center = view.center;
+    center.y = originalCenter.y + [gesture translationInView:self.view].y;
+    static CGFloat kMovementSmoothing = 0.1f;
+    [UIView animateWithDuration:kMovementSmoothing
+                          delay:0.0f
+                        options:UIViewAnimationOptionBeginFromCurrentState|
+     UIViewAnimationOptionAllowUserInteraction|
+     UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+                         self.visibleViewController.view.center = center;
+                     } completion:NULL];
+}
+
+#pragma mark Pan Gesture
 
 - (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture {
-
-}
-
-#pragma mark etc.
-
-- (void)viewDidLoad
-{
-    [super viewDidLoad];
-	// Do any additional setup after loading the view.
-}
-
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+    [self.visibleViewController.view.layer removeAllAnimations];
+    lastTouchY = [gesture locationInView:self.view].y;
+    if (!sliding && gesture.state == UIGestureRecognizerStateBegan) {
+        // Set original visible view center, touch position relative to visible view
+        originalPosition = [gesture locationInView:self.visibleViewController.view];
+        originalCenter = self.visibleViewController.view.center;
+        // Get out if touch is out of bounds
+        if (!CGRectContainsPoint(self.visibleViewController.view.frame, originalCenter))
+            return;
+        sliding = true;
+    } else if (sliding && gesture.state == UIGestureRecognizerStateChanged) {
+        [self centerView:self.visibleViewController.view onGesture:gesture];
+    } else if (sliding && gesture.state == UIGestureRecognizerStateEnded) {
+        [self centerView:self.visibleViewController.view onGesture:gesture];
+        sliding = false;
+    }
 }
 
 @end

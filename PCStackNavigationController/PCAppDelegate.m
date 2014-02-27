@@ -15,8 +15,11 @@
 {
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     UIViewController *rootViewController = [[UIViewController alloc] init];
-    rootViewController.view.backgroundColor = [UIColor grayColor];
+    rootViewController.view.backgroundColor = [UIColor whiteColor];
     PCStackNavigationController *stackNav = [[PCStackNavigationController alloc] initWithRootViewController:rootViewController];
+    UIViewController *bottomViewController = [[UIViewController alloc] init];
+    bottomViewController.view.backgroundColor = [UIColor grayColor];
+    stackNav.bottomViewController = bottomViewController;
     self.window.rootViewController = stackNav;
     self.window.backgroundColor = [UIColor whiteColor];
     [self.window makeKeyAndVisible];

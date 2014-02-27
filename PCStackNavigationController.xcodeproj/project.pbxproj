@@ -20,6 +20,7 @@
 		508E577F18BC4BD2006FB3D9 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 508E577D18BC4BD2006FB3D9 /* InfoPlist.strings */; };
 		508E578118BC4BD2006FB3D9 /* PCStackNavigationControllerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 508E578018BC4BD2006FB3D9 /* PCStackNavigationControllerTests.m */; };
 		508E578C18BC4C34006FB3D9 /* PCStackNavigationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 508E578B18BC4C34006FB3D9 /* PCStackNavigationController.m */; };
+		5092AE6418BEF88700C1CFB6 /* PCAnimation.m in Sources */ = {isa = PBXBuildFile; fileRef = 5092AE6318BEF88700C1CFB6 /* PCAnimation.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,8 @@
 		508E578018BC4BD2006FB3D9 /* PCStackNavigationControllerTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PCStackNavigationControllerTests.m; sourceTree = "<group>"; };
 		508E578A18BC4C34006FB3D9 /* PCStackNavigationController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PCStackNavigationController.h; sourceTree = "<group>"; };
 		508E578B18BC4C34006FB3D9 /* PCStackNavigationController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PCStackNavigationController.m; sourceTree = "<group>"; };
+		5092AE6218BEF88700C1CFB6 /* PCAnimation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PCAnimation.h; sourceTree = "<group>"; };
+		5092AE6318BEF88700C1CFB6 /* PCAnimation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PCAnimation.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,6 +155,8 @@
 			children = (
 				508E578A18BC4C34006FB3D9 /* PCStackNavigationController.h */,
 				508E578B18BC4C34006FB3D9 /* PCStackNavigationController.m */,
+				5092AE6218BEF88700C1CFB6 /* PCAnimation.h */,
+				5092AE6318BEF88700C1CFB6 /* PCAnimation.m */,
 			);
 			name = PCStackNavigationController;
 			sourceTree = "<group>";
@@ -264,6 +269,7 @@
 				508E576818BC4BD2006FB3D9 /* main.m in Sources */,
 				508E578C18BC4C34006FB3D9 /* PCStackNavigationController.m in Sources */,
 				508E576C18BC4BD2006FB3D9 /* PCAppDelegate.m in Sources */,
+				5092AE6418BEF88700C1CFB6 /* PCAnimation.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
