@@ -38,15 +38,15 @@ CGPoint originalCenter;
         [self.viewControllers addObject:rootViewController];
         self.visibleViewController = rootViewController;
         panGestureRecognizer.delegate = self;
-        self.rootViewControllerLowerBound = rootViewController.view.center.y - 50;
-        self.rootViewControllerUpperBound = (rootViewController.view.frame.size.height * 1.5) + 25;
+        self.rootViewControllerLowerBound = rootViewController.view.center.y;
+        self.rootViewControllerUpperBound = rootViewController.view.center.y;
     }
     return self;
 }
 
 - (void)setBottomViewController:(UIViewController *)bottomViewController {
     _bottomViewController = bottomViewController ? bottomViewController : nil;
-    _bottomViewController = bottomViewController;
+    self.rootViewControllerUpperBound = bottomViewController.view.frame.size.height * 1.5;
     [self.view insertSubview:_bottomViewController.view atIndex:0];
     [self.viewControllers insertObject:_bottomViewController atIndex:0];
 }
@@ -56,7 +56,7 @@ CGPoint originalCenter;
 - (float)smoothEdgeWithStart:(float)start limit:(float)limit point:(float)point {
     float areaHeight = abs(limit - start);
     float distance = abs(point - start);
-    float smoothed = ((2 / M_PI) * atanf(distance/(0.7*areaHeight)));
+    float smoothed = ((2 / M_PI) * atanf(distance/(0.7*areaHeight)))*1.2;
     float multiplied = smoothed * areaHeight;
     float newPosition = limit - start < 0 ? start - multiplied : start + multiplied;
     return newPosition;
@@ -65,12 +65,10 @@ CGPoint originalCenter;
 - (void)centerVisibleViewControllerOnGesture:(UIPanGestureRecognizer *)gesture {
     CGPoint center = self.visibleViewController.view.center;
     center.y = originalCenter.y + [gesture translationInView:self.view].y;
-    if (center.y > self.visibleViewController.view.frame.size.height * 1.5) {
-        float start = self.visibleViewController.view.frame.size.height * 1.5;
-        center.y = [self smoothEdgeWithStart:start limit:self.rootViewControllerUpperBound point:center.y];
-    } else if (center.y < self.visibleViewController.view.frame.size.height / 2) {
-        float start = self.visibleViewController.view.frame.size.height / 2;
-        center.y = [self smoothEdgeWithStart:start limit:self.rootViewControllerLowerBound point:center.y];
+    if (center.y > self.rootViewControllerUpperBound) {
+        center.y = [self smoothEdgeWithStart:self.rootViewControllerUpperBound limit:self.rootViewControllerUpperBound+50 point:center.y];
+    } else if (center.y < self.rootViewControllerLowerBound) {
+        center.y = [self smoothEdgeWithStart:self.rootViewControllerLowerBound limit:self.rootViewControllerLowerBound-50 point:center.y];
     }
     [self centerView:self.visibleViewController.view onPoint:center withDuration:0.0f easing:UIViewAnimationOptionCurveEaseOut];
 }
@@ -102,7 +100,14 @@ CGPoint originalCenter;
     } else if (sliding && gesture.state == UIGestureRecognizerStateChanged) {
         [self centerVisibleViewControllerOnGesture:gesture];
     } else if (sliding && gesture.state == UIGestureRecognizerStateEnded) {
-        [self centerView:self.visibleViewController.view onPoint:originalCenter withDuration:0.2 easing:UIViewAnimationOptionCurveEaseInOut];
+        float velocity = [gesture velocityInView:self.view].y;
+        CGPoint center = self.visibleViewController.view.center;
+        if (velocity < 0 || center.y < originalCenter.y || self.bottomViewController == NULL) {
+            center.y = self.rootViewControllerLowerBound;
+        } else {
+            center.y = self.rootViewControllerUpperBound - 80;
+        }
+        [self centerView:self.visibleViewController.view onPoint:center withDuration:0.2 easing:UIViewAnimationOptionCurveEaseInOut];
         sliding = false;
     }
 }

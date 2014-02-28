@@ -21,7 +21,7 @@
     bottomViewController.view.backgroundColor = [UIColor grayColor];
     stackNav.bottomViewController = bottomViewController;
     self.window.rootViewController = stackNav;
-    self.window.backgroundColor = [UIColor whiteColor];
+    self.window.backgroundColor = [UIColor grayColor];
     [self.window makeKeyAndVisible];
     return YES;
 }
