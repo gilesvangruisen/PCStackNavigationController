@@ -35,6 +35,7 @@ CGPoint originalCenter;
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
         [self.view addGestureRecognizer:panGestureRecognizer];
         [self.view addSubview:rootViewController.view];
+        rootViewController.view.layer.cornerRadius = 4;
         [self.viewControllers addObject:rootViewController];
         self.visibleViewController = rootViewController;
         panGestureRecognizer.delegate = self;
@@ -46,7 +47,7 @@ CGPoint originalCenter;
 
 - (void)setBottomViewController:(UIViewController *)bottomViewController {
     _bottomViewController = bottomViewController ? bottomViewController : nil;
-    self.rootViewControllerUpperBound = bottomViewController.view.frame.size.height * 1.5;
+    self.rootViewControllerUpperBound = (bottomViewController.view.frame.size.height * 1.5) - 80;
     [self.view insertSubview:_bottomViewController.view atIndex:0];
     [self.viewControllers insertObject:_bottomViewController atIndex:0];
 }
@@ -56,8 +57,8 @@ CGPoint originalCenter;
 - (float)smoothEdgeWithStart:(float)start limit:(float)limit point:(float)point {
     float areaHeight = abs(limit - start);
     float distance = abs(point - start);
-    float smoothed = ((2 / M_PI) * atanf(distance/(0.7*areaHeight)))*1.2;
-    float multiplied = smoothed * areaHeight;
+    float smoothed = -((2 / M_PI) * atanf(distance / areaHeight)) + 1.02;
+    float multiplied = smoothed * distance;
     float newPosition = limit - start < 0 ? start - multiplied : start + multiplied;
     return newPosition;
 }
@@ -105,7 +106,7 @@ CGPoint originalCenter;
         if (velocity < 0 || center.y < originalCenter.y || self.bottomViewController == NULL) {
             center.y = self.rootViewControllerLowerBound;
         } else {
-            center.y = self.rootViewControllerUpperBound - 80;
+            center.y = self.rootViewControllerUpperBound;
         }
         [self centerView:self.visibleViewController.view onPoint:center withDuration:0.2 easing:UIViewAnimationOptionCurveEaseInOut];
         sliding = false;
