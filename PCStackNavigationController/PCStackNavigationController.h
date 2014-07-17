@@ -10,10 +10,17 @@
 
 @protocol PCStackNavigationControllerDelegate;
 
+@class PCViewController;
+
 @interface PCStackNavigationController : UIViewController <UIGestureRecognizerDelegate>
 
-@property (nonatomic, strong) UIViewController *bottomViewController;
-@property (nonatomic, readonly, strong) UIViewController *visibleViewController;
+// View controller at the bottom of the stack. Revealed when sliding rootViewController (first pushed to stack)
+@property (nonatomic, strong) PCViewController *bottomViewController;
+
+// Returns the topmost view controller
+@property (nonatomic, readonly, strong) PCViewController *visibleViewController;
+
+// Array of view controllers in current stack
 @property (nonatomic, strong) NSMutableArray *viewControllers;
 
 @property (nonatomic, strong) UIView *topBar;
@@ -23,7 +30,12 @@
 @property (nonatomic, assign) CGFloat rootViewControllerUpperBound;
 @property (nonatomic, assign) CGFloat rootViewControllerLowerBound;
 
-- (id)initWithRootViewController:(UIViewController *)rootViewController;
+@property (nonatomic) BOOL trackingEnabled;
+
+- (void)pushViewController:(PCViewController *)viewController animated:(BOOL)animated;
+- (void)popViewControllerAnimated:(BOOL)animated;
+- (void)popToRootViewController:(BOOL)animated;
+- (void)popToViewController:(PCViewController *)viewController animated:(BOOL)animated;
 
 @end
 
