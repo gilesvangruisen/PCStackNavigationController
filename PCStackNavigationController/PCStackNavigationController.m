@@ -13,12 +13,12 @@
 #import "PCAnimation.h"
 #import <pop/POP.h>
 
+
+#pragma mark PCStackNavigationController private interface
+
 @interface PCStackNavigationController () {
     int currentIndex;
 }
-
-@property (nonatomic, strong) UIView *statusBarCover;
-@property (nonatomic, strong) PCViewController *visibleViewController;
 
 @end
 
@@ -42,7 +42,6 @@ CGPoint originalCenter;
         // Start watching for pan gestures
 
         currentIndex = -1;
-        self.trackingEnabled = YES;
         self.viewControllers = [@[] mutableCopy];
         self.view.backgroundColor = [UIColor clearColor];
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
@@ -52,8 +51,6 @@ CGPoint originalCenter;
         [self pushViewController:(PCViewController *)rootViewController animated:NO];
         panGestureRecognizer.delegate = self;
 
-        self.rootViewControllerLowerBound = rootViewController.view.center.y;
-        self.rootViewControllerUpperBound = rootViewController.view.center.y;
     }
     return self;
 }
