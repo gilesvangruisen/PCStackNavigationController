@@ -150,11 +150,18 @@ static CGPoint startCenter;
             break;
 
         case UIGestureRecognizerStateEnded:
+
             // Figure where to end up and spring the way there
             if (vertical && velocity.y > 300) {
-                CGPoint toCenter = self.visibleViewController.view.center;
-                toCenter.y = self.view.frame.size.height * 1.5;
-                [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
+
+                if (currentIndex > 0) {
+                    [self popViewControllerAnimated:true];
+                } else {
+                    CGPoint toCenter = self.visibleViewController.view.center;
+                    toCenter.y = self.view.frame.size.height * 1.5;
+                    [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
+                }
+
             } else if (vertical && velocity.y < -300) {
                 CGPoint toCenter = self.visibleViewController.view.center;
                 toCenter.y = self.view.frame.size.height / 2;
