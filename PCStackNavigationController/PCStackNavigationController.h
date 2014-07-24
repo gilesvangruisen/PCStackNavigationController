@@ -76,6 +76,6 @@
 @property (nonatomic, strong) PCStackNavigationController *stackController;
 
 // Returns the index of the view controller
-@property (nonatomic copy) NSInteger stackIndex;
+@property (nonatomic) NSInteger stackIndex;
 
 @end
