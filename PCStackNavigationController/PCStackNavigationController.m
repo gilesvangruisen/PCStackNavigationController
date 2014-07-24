@@ -7,8 +7,6 @@
 //
 
 #import "PCStackNavigationController.h"
-#import "PCRadarViewController.h"
-#import "PCViewController.h"
 #import <pop/POP.h>
 
 
@@ -45,19 +43,21 @@ CGPoint originalCenter;
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
         [self.view addGestureRecognizer:panGestureRecognizer];
 
-        PCRadarViewController *rootViewController = [PCRadarViewController radarViewController];
-        [self pushViewController:(PCViewController *)rootViewController animated:NO];
         panGestureRecognizer.delegate = self;
 
     }
     return self;
 }
 
-- (void)setBottomViewController:(PCViewController *)bottomViewController {
+- (void)setBottomViewController:(UIViewController<PCStackViewController> *)bottomViewController {
     _bottomViewController = bottomViewController ? bottomViewController : nil;
-    self.rootViewControllerUpperBound = (bottomViewController.view.frame.size.height * 1.5) - 60;
+    _bottomViewController.stackController = self;
 
     [self.viewControllers insertObject:_bottomViewController atIndex:0];
+    [self.view insertSubview:bottomViewController.view atIndex:0];
+
+    [bottomViewController didMoveToParentViewController:self];
+
     currentIndex += 1;
 }
 
@@ -88,11 +88,6 @@ static CGPoint startCenter;
     CGPoint translation = [gesture translationInView:self.view];
 
     toCenter.y += translation.y;
-    if (toCenter.y > self.rootViewControllerUpperBound) {
-        toCenter.y = [self smoothEdgeWithStart:self.rootViewControllerUpperBound limit:self.rootViewControllerUpperBound+60 point:toCenter.y];
-    } else if (toCenter.y < self.rootViewControllerLowerBound) {
-        toCenter.y = [self smoothEdgeWithStart:self.rootViewControllerLowerBound limit:self.rootViewControllerLowerBound-50 point:toCenter.y];
-    }
 
     self.visibleViewController.view.center = toCenter;
 }
@@ -131,7 +126,7 @@ static CGPoint startCenter;
             // Figure angle and disable/enable interaction
             if (fabsf(velocity.y) > fabsf(velocity.x)) {
                 CGFloat viewY = self.visibleViewController.view.center.y;
-                if (viewY == self.rootViewControllerLowerBound || viewY == self.rootViewControllerUpperBound) {
+                if (viewY == self.view.frame.size.height / 2 || viewY == self.view.frame.size.height * 1.5) {
                     startY = self.visibleViewController.view.center.y;
                 }
 
@@ -158,11 +153,11 @@ static CGPoint startCenter;
             // Figure where to end up and spring the way there
             if (vertical && velocity.y > 300) {
                 CGPoint toCenter = self.visibleViewController.view.center;
-                toCenter.y = self.rootViewControllerUpperBound;
+                toCenter.y = self.view.frame.size.height * 1.5;
                 [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
             } else if (vertical && velocity.y < -300) {
                 CGPoint toCenter = self.visibleViewController.view.center;
-                toCenter.y = self.rootViewControllerLowerBound;
+                toCenter.y = self.view.frame.size.height / 2;
                 [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
             } else if (vertical) {
                 CGPoint toCenter = self.visibleViewController.view.center;
@@ -174,69 +169,23 @@ static CGPoint startCenter;
     }
 }
 
-- (void)updateStatusBarCoverWithCenter:(CGPoint)center animated:(BOOL)animated {
-    CGFloat alpha;
-    if (self.viewControllers.count < 3) {
-        CGFloat progress = [PCAnimation trackingProgressWithPosition:center.y start:self.rootViewControllerLowerBound end:self.rootViewControllerUpperBound];
-        alpha = [PCAnimation positionWithProgress:[PCAnimation smoothStep:progress] start:0.7 end:0.3];
-        [self.statusBarCover.layer removeAllAnimations];
-    } else {
-        alpha = 1;
-    }
-    if (animated) {
-        [UIView animateWithDuration:0.3f
-                              delay:0.0f
-                            options:UIViewAnimationOptionBeginFromCurrentState|
-         UIViewAnimationOptionAllowUserInteraction|
-         UIViewAnimationCurveEaseOut
-                         animations:^{
-                             self.statusBarCover.alpha = alpha;
-                         } completion:NULL];
-    } else {
-        self.statusBarCover.alpha = alpha;
-    }
-}
-
-- (void)updateAlphaScaleOfView:(UIView *)view withCenter:(CGPoint)center animated:(BOOL)animated {
-    CGFloat progress = [PCAnimation trackingProgressWithPosition:center.y start:self.rootViewControllerLowerBound end:self.rootViewControllerUpperBound];
-    CGFloat scaleFactor = [PCAnimation positionWithProgress:[PCAnimation smoothStep:progress] start:0.92 end:1];
-    CGFloat alpha = [PCAnimation positionWithProgress:[PCAnimation smoothStep:progress] start:0.25 end:1];
-    CGAffineTransform scale = CGAffineTransformMakeScale(scaleFactor, scaleFactor);
-    CGFloat heightDifference = view.frame.size.height - (view.frame.size.height * scaleFactor);
-    CGAffineTransform translate = CGAffineTransformMakeTranslation(0, -heightDifference / 4);
-    [self.visibleViewController.view.layer removeAllAnimations];
-    if (animated) {
-        [UIView animateWithDuration:0.3f
-                              delay:0.0f
-                            options:UIViewAnimationOptionBeginFromCurrentState|
-         UIViewAnimationOptionAllowUserInteraction|
-         UIViewAnimationCurveEaseOut
-                         animations:^{
-                             view.transform = CGAffineTransformConcat(scale, translate);
-                             view.alpha = alpha;
-                         } completion:NULL];
-    } else {
-        view.transform = CGAffineTransformConcat(scale, translate);
-        view.alpha = alpha;
-    }
-}
-
 #pragma mark Push/Pop
 
-- (void)pushViewController:(PCViewController *)viewController animated:(BOOL)animated {
+- (void)pushViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated {
+
     self.visibleViewController.view.userInteractionEnabled = NO;
-    PCViewController *outgoing = self.visibleViewController;
+    UIViewController<PCStackViewController> *outgoing = self.visibleViewController;
     [self.viewControllers addObject:viewController];
 
     [self addChildViewController:viewController];
     [viewController didMoveToParentViewController:self];
 
-    [self updateStatusBarCoverWithCenter:self.visibleViewController.view.center animated:NO];
     self.visibleViewController = viewController;
     self.visibleViewController.stackController = self;
+
     if (bottomViewControllerVisible) {
         CGPoint center = outgoing.view.center;
-        center.y = self.rootViewControllerLowerBound;
+        center.y = self.view.frame.size.height / 2;
         [self springCenterView:outgoing.view toPoint:center velocity:CGPointMake(0, 0)];
     }
 
@@ -248,7 +197,6 @@ static CGPoint startCenter;
         // Reset proper center
         center.y -= self.view.frame.size.height;
         [self.view addSubview:self.visibleViewController.view];
-        [self updateAlphaScaleOfView:outgoing.view withCenter:center animated:YES];
         [self springCenterView:self.visibleViewController.view toPoint:center velocity:CGPointMake(50,50)];
     } else {
         [self.view addSubview:self.visibleViewController.view];
@@ -257,13 +205,13 @@ static CGPoint startCenter;
 }
 
 - (void)popViewControllerAnimated:(BOOL)animated {
-    PCViewController *outgoing = [self.viewControllers lastObject];
+    UIViewController<PCStackViewController> *outgoing = [self.viewControllers lastObject];
     [self.viewControllers removeLastObject];
     self.visibleViewController = [self.viewControllers lastObject];
 
     CGPoint center = self.visibleViewController.view.center;
     center.y += self.view.frame.size.height;
-    
+
     [self centerView:outgoing.view onPoint:center withDuration:0.3 easing:UIViewAnimationOptionCurveEaseOut];
     self.visibleViewController.view.userInteractionEnabled = YES;
 
@@ -273,7 +221,7 @@ static CGPoint startCenter;
     });
 }
 
-- (void)popToViewController:(PCViewController *)viewController animated:(BOOL)animated {
+- (void)popToViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated {
 
 }
 
@@ -288,11 +236,6 @@ static CGPoint startCenter;
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle {
-    self.statusBarCover = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 20)];
-    self.statusBarCover.backgroundColor = [UIColor blackColor];
-    self.statusBarCover.alpha = 0.5;
-    [self.view addSubview:self.statusBarCover];
-    [self.view sendSubviewToBack:self.statusBarCover];
     return UIStatusBarStyleLightContent;
 }
 
