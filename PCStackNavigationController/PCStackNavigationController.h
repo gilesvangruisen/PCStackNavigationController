@@ -19,19 +19,23 @@
 
 @interface PCStackNavigationController : UIViewController <UIGestureRecognizerDelegate>
 
+
 #pragma mark PCStackNavigationController properties
-
-// View controller at the bottom of the stack. Revealed when sliding rootViewController (first pushed to stack)
-@property (nonatomic, strong) UIViewController<PCStackViewController> *bottomViewController;
-
-// Returns the topmost view controller
-@property (nonatomic, strong) UIViewController<PCStackViewController> *visibleViewController;
 
 // Array of view controllers in current stack
 @property (nonatomic, strong) NSMutableArray *viewControllers;
 
-// Stack nav delegate receives
+// Stack nav delegate
 @property (nonatomic, strong) id<PCStackNavigationControllerDelegate> delegate;
+
+// Returns the index of visible view controller in the stack, also equal to the size of the stack itself
+@property (nonatomic) NSInteger currentIndex;
+
+// View controller at the top of the stack
+@property (nonatomic, weak) UIViewController<PCStackViewController> *visibleViewController;
+
+// View controller at the bottom of the stack
+@property (nonatomic, weak) UIViewController<PCStackViewController> *bottomViewController;
 
 
 #pragma mark PCStackNavigationController methods
