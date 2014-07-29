@@ -22,26 +22,22 @@
 
 #pragma mark PCStackNavigationController properties
 
-// Array of view controllers in current stack
-@property (nonatomic, strong) NSMutableArray *viewControllers;
-
 // Stack nav delegate
 @property (nonatomic, strong) id<PCStackNavigationControllerDelegate> delegate;
 
 // Returns the index of visible view controller in the stack, also equal to the size of the stack itself
 @property (nonatomic) NSInteger currentIndex;
 
-// View controller at the top of the stack
-@property (nonatomic, weak) UIViewController<PCStackViewController> *visibleViewController;
-
 // View controller at the bottom of the stack
 @property (nonatomic, weak) UIViewController<PCStackViewController> *bottomViewController;
 
+// Returns the top (i.e. last) view controller in viewControllers
+- (UIViewController<PCStackViewController> *)topViewController;
 
 #pragma mark PCStackNavigationController methods
 
 // Push a view controller to the stack
-- (void)pushViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated;
+- (void)pushViewController:(UIViewController<PCStackViewController> *)incomingViewController animated:(BOOL)animated;
 
 // Pop the top view controller off the stack
 - (void)popViewControllerAnimated:(BOOL)animated;

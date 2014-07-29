@@ -9,95 +9,79 @@
 #import "PCStackNavigationController.h"
 #import <pop/POP.h>
 
-
-#pragma mark PCStackNavigationController private interface
-
-@interface PCStackNavigationController () {
-    int currentIndex;
-}
-
-@end
-
 @implementation PCStackNavigationController
+
+#define SPRING_BOUNCINESS 4
+#define SPRING_SPEED 4
+#define DISMISS_VELOCITY_THRESHOLD 150
 
 #pragma mark initialization
 
-@synthesize bottomViewController = _bottomViewController;
-
-float velocity;
-float lastTouchY;
-bool sliding;
-bool rootViewControllerVisible;
-bool bottomViewControllerVisible;
-CGPoint originalPosition;
-CGPoint originalCenter;
-
-- (id)init {
+- (id)init
+{
     self = [super init];
     if (self) {
-        // Start watching for pan gestures
 
-        currentIndex = -1;
-        self.viewControllers = [@[] mutableCopy];
+        // Set stack nav background to transparent
         self.view.backgroundColor = [UIColor clearColor];
+
+        // Init gesture recognizer, add it to view, set gesture delegate to self
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
         [self.view addGestureRecognizer:panGestureRecognizer];
-
         panGestureRecognizer.delegate = self;
 
     }
+
     return self;
 }
 
-- (void)setBottomViewController:(UIViewController<PCStackViewController> *)bottomViewController {
+- (UIViewController<PCStackViewController> *)visibleViewController
+{
+    // Visible view controller is last childViewController
+    return [self.childViewControllers lastObject];
+}
+
+- (NSInteger)currentIndex
+{
+    // Current index is index of last childViewController (count - 1)
+    return self.childViewControllers.count - 1;
+}
+
+- (void)setBottomViewController:(UIViewController<PCStackViewController> *)bottomViewController
+{
+
+    // Set _bottomViewController because custom setter
     _bottomViewController = bottomViewController ? bottomViewController : nil;
+
+    // Set PCStackViewController properties on bottomViewController
     _bottomViewController.stackController = self;
+    _bottomViewController.stackIndex = 0;
 
-    [self.viewControllers insertObject:_bottomViewController atIndex:0];
-    [self.view insertSubview:bottomViewController.view atIndex:0];
+    // Prepend bottomViewController to viewController, add as subview
+    [self addChildViewController:_bottomViewController];
+    [self.view insertSubview:_bottomViewController.view atIndex:0];
+    [_bottomViewController didMoveToParentViewController:self];
 
-    [bottomViewController didMoveToParentViewController:self];
+    // bottomViewController now contained by self
+    [self.bottomViewController didMoveToParentViewController:self];
 
-    currentIndex += 1;
 }
 
-#pragma mark Animations
+- (void)centerView:(UIView *)view onGesture:(UIPanGestureRecognizer *)gesture {
+    // Static variable originalCenter
+    static CGPoint originalCenter;
 
-- (float)smoothEdgeWithStart:(float)start limit:(float)limit point:(float)point {
-    float areaHeight = abs(limit - start);
-    float distance = abs(point - start);
-    float smoothed = -((2 / M_PI) * atanf(distance / areaHeight)) + 1.0;
-    float multiplied = smoothed * distance;
-    float newPosition = limit - start < 0 ? start - multiplied : start + multiplied;
-    return newPosition;
-}
-
-static CGPoint startCenter;
-- (void)centerVisibleViewControllerOnGesture:(UIPanGestureRecognizer *)gesture {
+    // Remove any animations
+    [view.layer pop_removeAllAnimations];
 
     // Set initial start center only on began
     if (gesture.state == UIGestureRecognizerStateBegan) {
-        startCenter = self.visibleViewController.view.center;
+        originalCenter = view.center;
     }
 
-    // To center is current center + translation, but not
-    [self.visibleViewController.view.layer pop_removeAllAnimations];
-    CGPoint toCenter = startCenter;
-    toCenter.x = self.view.frame.size.width / 2;
-
-    CGPoint translation = [gesture translationInView:self.view];
-
-    toCenter.y += translation.y;
-
-    self.visibleViewController.view.center = toCenter;
-}
-
-- (void)springCenterView:(UIView *)view toPoint:(CGPoint)point velocity:(CGPoint)velocity {
-    POPSpringAnimation *animation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPosition];
-    animation.fromValue = [NSValue valueWithCGPoint:view.center];
-    animation.toValue = [NSValue valueWithCGPoint:point];
-    animation.velocity = [NSValue valueWithCGPoint:velocity];
-    [view.layer pop_addAnimation:animation forKey:@"spring"];
+    // Calculate new center based on original + translation
+    CGFloat newCenterY = originalCenter.y + [gesture translationInView:self.view].y;
+    view.center = CGPointMake(originalCenter.x, newCenterY);
 }
 
 - (void)centerView:(UIView *)view onPoint:(CGPoint)point withDuration:(CGFloat)duration easing:(UIViewAnimationOptions)viewAnimationOptions {
@@ -113,119 +97,179 @@ static CGPoint startCenter;
 
 #pragma mark Pan Gesture
 
-- (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture {
-    static CGFloat startY;
-    CGPoint velocity = [gesture velocityInView:self.view];
-    CGPoint popVelocity = CGPointMake(0, velocity.y);
-    static BOOL vertical;
+
+
+- (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture
+{
+    // Static variables set only on UIGestureRecognizerStateBegan
+    static UIViewController<PCStackViewController> *viewController;
+    static CGPoint originalCenter;
+    static BOOL gestureIsNavigational = false;
 
     switch (gesture.state) {
 
-        case UIGestureRecognizerStateBegan:
+        // Gesture just began, determine angle from velocity
+        // Enable interaction, disable scroll if gesture is vertical and (if applicable) only scroll view offset is 0
+        case UIGestureRecognizerStateBegan: {
+            originalCenter = [gesture locationInView:self.view];
 
-            // Figure angle and disable/enable interaction
-            if (fabsf(velocity.y) > fabsf(velocity.x)) {
-                CGFloat viewY = self.visibleViewController.view.center.y;
-                if (viewY == self.view.frame.size.height / 2 || viewY == self.view.frame.size.height * 1.5) {
-                    startY = self.visibleViewController.view.center.y;
+            // Find the right view controller
+            NSEnumerator *childViewControllerEnumerator = [self.childViewControllers reverseObjectEnumerator];
+            UIViewController<PCStackViewController> *childViewController;
+            while(childViewController = [childViewControllerEnumerator nextObject]) {
+                if ([self gesture:gesture canNavigateViewController:childViewController]) {
+                    viewController = childViewController;
+                    gestureIsNavigational = true;
+                    break;
                 }
-
-                vertical = true;
-                [self centerVisibleViewControllerOnGesture:gesture];
-                // Navigation interaction, disable active view controller
-
-            } else {
-                vertical = false;
             }
-            break;
 
-        case UIGestureRecognizerStateChanged:
+            if (gestureIsNavigational) {
 
-            //  Move y according to gesture
-            if (vertical) {
-                [self centerVisibleViewControllerOnGesture:gesture];
-            } else {
-                break;
-            }
-            break;
+                // Gesture is indeed navigational
+                // Set static originalCenter
+                originalCenter = viewController.view.center;
 
-        case UIGestureRecognizerStateEnded:
+                // Disable scroll if visible view is scroll view
+//                [self disableScrollIfScrollView];
 
-            // Figure where to end up and spring the way there
-            if (vertical && velocity.y > 300) {
+                [self centerView:viewController.view onGesture:gesture];
 
-                if (currentIndex > 0) {
-                    [self popViewControllerAnimated:true];
-                } else {
-                    CGPoint toCenter = self.visibleViewController.view.center;
-                    toCenter.y = self.view.frame.size.height * 1.5;
-                    [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
-                }
-
-            } else if (vertical && velocity.y < -300) {
-                CGPoint toCenter = self.visibleViewController.view.center;
-                toCenter.y = self.view.frame.size.height / 2;
-                [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
-            } else if (vertical) {
-                CGPoint toCenter = self.visibleViewController.view.center;
-                toCenter.y = startY;
-                [self springCenterView:self.visibleViewController.view toPoint:toCenter velocity:popVelocity];
             }
 
             break;
+        }
+
+        case UIGestureRecognizerStateChanged: {
+            if (gestureIsNavigational) {
+
+                // Gesture is indeed navigational, handle gesture
+                [self centerView:viewController.view onGesture:gesture];
+
+            }
+
+            break;
+        }
+
+        case UIGestureRecognizerStateEnded: {
+
+            if (gestureIsNavigational) {
+
+                // Gesture is indeed navigational, handle gesture ended
+                [self handleNavigationGestureEnded:gesture withOriginalCenter:originalCenter viewController:viewController];
+                viewController = nil;
+
+            }
+
+            break;
+        }
     }
 }
+
+- (void)handleNavigationGestureEnded:(UIPanGestureRecognizer *)gesture withOriginalCenter:(CGPoint)originalCenter viewController:(UIViewController <PCStackViewController> *)viewController
+{
+    // Grab velocity and location from gesture
+    CGPoint velocity = [gesture velocityInView:self.view];
+
+    // Spring animation
+    POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+    springAnimation.springBounciness = SPRING_BOUNCINESS;
+    springAnimation.springSpeed = SPRING_SPEED;
+    springAnimation.velocity = @(velocity.y);
+
+    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex <= 0) {
+
+        // Velocity is positive and above threshold (downward "dismiss card" swipe)
+        // Check index and presence of bottom vc
+
+        if (self.bottomViewController) {
+
+            // Bottom view controller exists, reveal it (w/ 80 px of vc still showing)
+            springAnimation.toValue = @((self.view.frame.size.height * 1.5) - 80);
+
+        } else {
+
+            // No bottomViewController, return to visible center
+            springAnimation.toValue = @(self.view.center.y);
+
+        }
+
+    } else if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
+
+        // Dismiss view gesture, send it off screen
+        springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+
+        // On completion, remove from superview
+        springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+
+            if (completed) {
+                [viewController.view removeFromSuperview];
+                [viewController removeFromParentViewController];
+            }
+
+        };
+
+    } else {
+
+        // Velocity is negative and below threshold (upward "throw" swipe)
+        springAnimation.toValue = @(self.view.center.y);
+
+    }
+
+    [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.navigate"];
+
+}
+
 
 #pragma mark Push/Pop
 
-- (void)pushViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated {
+- (void)pushViewController:(UIViewController<PCStackViewController> *)incomingViewController animated:(BOOL)animated {
 
-    self.visibleViewController.view.userInteractionEnabled = NO;
-    UIViewController<PCStackViewController> *outgoing = self.visibleViewController;
-    [self.viewControllers addObject:viewController];
+    // Incoming needs to know its index and stack controller
+    incomingViewController.stackIndex = self.childViewControllers.count;
+    incomingViewController.stackController = self;
 
-    [self addChildViewController:viewController];
-    [viewController didMoveToParentViewController:self];
-
-    self.visibleViewController = viewController;
-    self.visibleViewController.stackController = self;
-
-    if (bottomViewControllerVisible) {
-        CGPoint center = outgoing.view.center;
-        center.y = self.view.frame.size.height / 2;
-        [self springCenterView:outgoing.view toPoint:center velocity:CGPointMake(0, 0)];
-    }
+    // Add child view controller to self (calls willMoveToParent)
+    [self addChildViewController:incomingViewController];
 
     if (animated) {
-        CGPoint center = self.visibleViewController.view.center;
-        // Move off screen before we add to view stack
-        center.y += self.view.frame.size.height;
-        self.visibleViewController.view.center = center;
-        // Reset proper center
-        center.y -= self.view.frame.size.height;
-        [self.view addSubview:self.visibleViewController.view];
-        [self springCenterView:self.visibleViewController.view toPoint:center velocity:CGPointMake(50,50)];
+
+        // Animated, ensure initial frame is offscreen
+        CGRect offScreenFrame = incomingViewController.view.frame;
+        offScreenFrame.origin.y = self.view.frame.size.height;
+        incomingViewController.view.frame = offScreenFrame;
+
+        // Add incoming as subview
+        [self.view addSubview:incomingViewController.view];
+
+        // Build spring animation to animate incoming into view
+        POPSpringAnimation *springEnterAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+        springEnterAnimation.springBounciness = SPRING_BOUNCINESS;
+        springEnterAnimation.springSpeed = SPRING_SPEED;
+        springEnterAnimation.toValue = @(self.view.center.y);
+
+        // Add spring enter animation to incoming view controller
+        [incomingViewController.view.layer pop_addAnimation:springEnterAnimation forKey:@"stackNav.enter"];
+
     } else {
-        [self.view addSubview:self.visibleViewController.view];
+
+        // Add incoming to view controller stack
+        [self addChildViewController:incomingViewController];
+
+        // Add incoming as visible subview
+        [self.view addSubview:incomingViewController.view];
+
+        [incomingViewController didMoveToParentViewController:self];
+
     }
-    currentIndex += 1;
+
+    // Incoming moved to parent
+    [incomingViewController didMoveToParentViewController:self];
+
 }
 
 - (void)popViewControllerAnimated:(BOOL)animated {
-    UIViewController<PCStackViewController> *outgoing = [self.viewControllers lastObject];
-    [self.viewControllers removeLastObject];
-    self.visibleViewController = [self.viewControllers lastObject];
 
-    CGPoint center = self.visibleViewController.view.center;
-    center.y += self.view.frame.size.height;
-
-    [self centerView:outgoing.view onPoint:center withDuration:0.3 easing:UIViewAnimationOptionCurveEaseOut];
-    self.visibleViewController.view.userInteractionEnabled = YES;
-
-    currentIndex -= 1;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        [outgoing.view removeFromSuperview];
-    });
 }
 
 - (void)popToViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated {
@@ -234,6 +278,77 @@ static CGPoint startCenter;
 
 - (void)popToRootViewController:(BOOL)animated {
 
+}
+
+// Returns true if gesture passed is intended to be navigational (combination of axis, state of view controller, gesture being within bounds)
+- (BOOL)gesture:(UIPanGestureRecognizer *)gesture canNavigateViewController:(UIViewController<PCStackViewController> *)viewController
+{
+    /*
+
+     DETERMINING PRIMARY AXIS OF GESTURE (VERTICAL VS HORIZONTAL)
+
+     Determine primary gesture axis by comparing absolute velocity on each axis
+     If absolute velocity along y axis is greater than absolute velocity along x axis then gesture is primarily vertical
+     If absolute velocity along x axis is greater than absolute velocity along y axis then gesture is primarily horizontal
+
+     */
+
+    // Grab velocity and location in view from gesture
+    CGPoint gestureVelocity = [gesture velocityInView:self.view];
+    CGPoint gestureLocation = [gesture locationInView:self.view];
+
+    // will set to true if gesture is primarily vertical as noted above
+    BOOL gestureIsNavigational = fabsf(gestureVelocity.y) > fabsf(gestureVelocity.x);
+
+    // Check if visible view is scroll view and let that help determine if gesture is navigational
+    if ([self visibleViewIsScrollView]) {
+
+        // Visible view is scroll view, add isScrolledToTop to navigation boolean
+        gestureIsNavigational = gestureIsNavigational && [self visibleViewIsScrolledToTop];
+
+    }
+
+    // Check that we're not trying to navigate the root view controller
+    gestureIsNavigational = gestureIsNavigational && viewController.stackIndex > 0;
+
+    // Check if original gesture position is inside visibleViewController's view frame and let hat help determine if gesture is navigational
+    gestureIsNavigational = gestureIsNavigational && [self point:gestureLocation isWithinBounds:viewController.view.frame];
+
+    return gestureIsNavigational;
+}
+
+- (BOOL)point:(CGPoint)point isWithinBounds:(CGRect)bounds
+{
+    BOOL pointWithinHorizontalBounds = point.x >= bounds.origin.x && point.x <= bounds.origin.x + bounds.size.width;
+    BOOL pointWithinVerticalBounds = point.y >= bounds.origin.y && point.y <= bounds.origin.y + bounds.size.height;
+
+    return pointWithinHorizontalBounds && pointWithinVerticalBounds;
+}
+
+- (BOOL)visibleViewIsScrollView
+{
+    // Returns true if visible view is scroll view
+    return [[self visibleViewController].view isKindOfClass:[UIScrollView class]];
+}
+
+- (BOOL)visibleViewIsScrolledToTop
+{
+
+    // Check if visible view is scroll view or subclass thereof
+    if ([[self visibleViewController].view isKindOfClass:[UIScrollView class]]) {
+
+        // Cast visible view into scrollView to be able to check contentOffset
+        UIScrollView *scrollView = (UIScrollView *)[self visibleViewController].view;
+
+        // Returns true if scroll view is scrolled to top
+        return scrollView.contentOffset.y <= 0;
+
+    } else {
+
+        // Not scroll view ergo cannot be scrolled to top
+        return false;
+
+    }
 }
 
 #pragma mark etc.
