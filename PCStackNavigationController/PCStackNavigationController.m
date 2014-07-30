@@ -24,7 +24,6 @@
 
         // Set stack nav background to transparent
         self.view.backgroundColor = [UIColor clearColor];
-
         // Init gesture recognizer, add it to view, set gesture delegate to self
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
         [self.view addGestureRecognizer:panGestureRecognizer];
@@ -35,7 +34,7 @@
     return self;
 }
 
-- (UIViewController<PCStackViewController> *)visibleViewController
+- (UIViewController<PCStackViewController> *)topViewController
 {
     // Visible view controller is last childViewController
     return [self.childViewControllers lastObject];
@@ -308,9 +307,10 @@
     // Check if visible view is scroll view and let that help determine if gesture is navigational
     if ([self viewIsScrollView:viewController.view]) {
 
-        // Visible view is scroll view, add isScrolledToTop to navigation boolean
-        gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:viewController.view];
-
+        // View is scroll view, add isScrolledToTop if content taller than frame and velocity > 0
+        if ([self scrollViewContentIsTallerThanFrame:viewController.view]) {
+            gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:viewController.view] && gestureVelocity.y > 0;
+        }
     }
 
     // Check that we're not trying to navigate the root view controller
@@ -336,10 +336,21 @@
     return [view isKindOfClass:[UIScrollView class]];
 }
 
+- (BOOL)scrollViewContentIsTallerThanFrame:(UIView *)view
+{
+    if ([self viewIsScrollView:view]) {
+        UIScrollView *scrollView = (UIScrollView *)view;
+        return scrollView.contentSize.height > scrollView.frame.size.height;
+    } else {
+        return false;
+    }
+}
+
 - (void)disableScrollView:(UIView *)view
 {
     if ([self viewIsScrollView:view]) {
         UIScrollView *scrollView = (UIScrollView *)view;
+        scrollView.contentOffset = CGPointMake(0, 0);
         scrollView.scrollEnabled = false;
     }
 }
@@ -378,8 +389,14 @@
     return YES;
 }
 
-- (UIStatusBarStyle)preferredStatusBarStyle {
-    return UIStatusBarStyleLightContent;
+- (UIViewController *)childViewControllerForStatusBarHidden
+{
+    return self.topViewController;
+}
+
+- (UIViewController *)childViewControllerForStatusBarStyle
+{
+    return self.topViewController;
 }
 
 @end
