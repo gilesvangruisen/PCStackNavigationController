@@ -15,10 +15,10 @@
 #define SPRING_SPEED 4
 #define DISMISS_VELOCITY_THRESHOLD 150
 
+
 #pragma mark initialization
 
-- (id)init
-{
+- (id)init {
     self = [super init];
     if (self) {
 
@@ -34,20 +34,20 @@
     return self;
 }
 
-- (UIViewController<PCStackViewController> *)topViewController
-{
+
+- (UIViewController<PCStackViewController> *)topViewController {
     // Visible view controller is last childViewController
     return [self.childViewControllers lastObject];
 }
 
-- (NSInteger)currentIndex
-{
+
+- (NSInteger)currentIndex {
     // Current index is index of last childViewController (count - 1)
     return self.childViewControllers.count - 1;
 }
 
-- (void)setBottomViewController:(UIViewController<PCStackViewController> *)bottomViewController
-{
+
+- (void)setBottomViewController:(UIViewController<PCStackViewController> *)bottomViewController {
 
     // Set _bottomViewController because custom setter
     _bottomViewController = bottomViewController ? bottomViewController : nil;
@@ -66,6 +66,7 @@
 
 }
 
+
 - (void)centerView:(UIView *)view onGesture:(UIPanGestureRecognizer *)gesture {
     // Static variable originalCenter
     static CGPoint originalCenter;
@@ -83,6 +84,7 @@
     view.center = CGPointMake(originalCenter.x, newCenterY);
 }
 
+
 - (void)centerView:(UIView *)view onPoint:(CGPoint)point withDuration:(CGFloat)duration easing:(UIViewAnimationOptions)viewAnimationOptions {
     [UIView animateWithDuration:duration
                           delay:0.0f
@@ -94,12 +96,11 @@
                      } completion:NULL];
 }
 
+
+
 #pragma mark Pan Gesture
 
-
-
-- (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture
-{
+- (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture {
     // Static variables set only on UIGestureRecognizerStateBegan
     static UIViewController<PCStackViewController> *viewController;
     static CGPoint originalCenter;
@@ -165,8 +166,8 @@
     }
 }
 
-- (void)handleNavigationGestureEnded:(UIPanGestureRecognizer *)gesture withOriginalCenter:(CGPoint)originalCenter viewController:(UIViewController <PCStackViewController> *)viewController
-{
+
+- (void)handleNavigationGestureEnded:(UIPanGestureRecognizer *)gesture withOriginalCenter:(CGPoint)originalCenter viewController:(UIViewController <PCStackViewController> *)viewController {
     // Grab velocity and location from gesture
     CGPoint velocity = [gesture velocityInView:self.view];
 
@@ -225,6 +226,7 @@
 }
 
 
+
 #pragma mark Push/Pop
 
 - (void)pushViewController:(UIViewController<PCStackViewController> *)incomingViewController animated:(BOOL)animated {
@@ -272,21 +274,24 @@
 
 }
 
+
 - (void)popViewControllerAnimated:(BOOL)animated {
 
 }
+
 
 - (void)popToViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated {
 
 }
 
+
 - (void)popToRootViewController:(BOOL)animated {
 
 }
 
+
 // Returns true if gesture passed is intended to be navigational (combination of axis, state of view controller, gesture being within bounds)
-- (BOOL)gesture:(UIPanGestureRecognizer *)gesture canNavigateViewController:(UIViewController<PCStackViewController> *)viewController
-{
+- (BOOL)gesture:(UIPanGestureRecognizer *)gesture canNavigateViewController:(UIViewController<PCStackViewController> *)viewController {
     /*
 
      DETERMINING PRIMARY AXIS OF GESTURE (VERTICAL VS HORIZONTAL)
@@ -322,22 +327,22 @@
     return gestureIsNavigational;
 }
 
-- (BOOL)point:(CGPoint)point isWithinBounds:(CGRect)bounds
-{
+
+- (BOOL)point:(CGPoint)point isWithinBounds:(CGRect)bounds {
     BOOL pointWithinHorizontalBounds = point.x >= bounds.origin.x && point.x <= bounds.origin.x + bounds.size.width;
     BOOL pointWithinVerticalBounds = point.y >= bounds.origin.y && point.y <= bounds.origin.y + bounds.size.height;
 
     return pointWithinHorizontalBounds && pointWithinVerticalBounds;
 }
 
-- (BOOL)viewIsScrollView:(UIView *)view
-{
+
+- (BOOL)viewIsScrollView:(UIView *)view {
     // Returns true if visible view is scroll view
     return [view isKindOfClass:[UIScrollView class]];
 }
 
-- (BOOL)scrollViewContentIsTallerThanFrame:(UIView *)view
-{
+
+- (BOOL)scrollViewContentIsTallerThanFrame:(UIView *)view {
     if ([self viewIsScrollView:view]) {
         UIScrollView *scrollView = (UIScrollView *)view;
         return scrollView.contentSize.height > scrollView.frame.size.height;
@@ -346,8 +351,8 @@
     }
 }
 
-- (void)disableScrollView:(UIView *)view
-{
+
+- (void)disableScrollView:(UIView *)view {
     if ([self viewIsScrollView:view]) {
         UIScrollView *scrollView = (UIScrollView *)view;
         scrollView.contentOffset = CGPointMake(0, 0);
@@ -355,16 +360,16 @@
     }
 }
 
-- (void)enableScrollView:(UIView *)view
-{
+
+- (void)enableScrollView:(UIView *)view {
     if ([self viewIsScrollView:view]) {
         UIScrollView *scrollView = (UIScrollView *)view;
         scrollView.scrollEnabled = true;
     }
 }
 
-- (BOOL)scrollViewIsScrolledToTop:(UIView *)view
-{
+
+- (BOOL)scrollViewIsScrolledToTop:(UIView *)view {
 
     // Check if visible view is scroll view or subclass thereof
     if ([self viewIsScrollView:view]) {
@@ -383,20 +388,22 @@
     }
 }
 
+
 #pragma mark etc.
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return YES;
 }
 
-- (UIViewController *)childViewControllerForStatusBarHidden
-{
+
+- (UIViewController *)childViewControllerForStatusBarHidden {
     return self.topViewController;
 }
 
-- (UIViewController *)childViewControllerForStatusBarStyle
-{
+
+- (UIViewController *)childViewControllerForStatusBarStyle {
     return self.topViewController;
 }
+
 
 @end
