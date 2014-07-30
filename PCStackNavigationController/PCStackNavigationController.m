@@ -131,7 +131,7 @@
                 originalCenter = viewController.view.center;
 
                 // Disable scroll if visible view is scroll view
-//                [self disableScrollIfScrollView];
+                [self disableScrollView:viewController.view];
 
                 [self centerView:viewController.view onGesture:gesture];
 
@@ -176,6 +176,9 @@
     springAnimation.springBounciness = SPRING_BOUNCINESS;
     springAnimation.springSpeed = SPRING_SPEED;
     springAnimation.velocity = @(velocity.y);
+    springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+        [self enableScrollView:viewController.view];
+    };
 
     if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex <= 0) {
 
@@ -199,8 +202,10 @@
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
 
-        // On completion, remove from superview
+        // On completion, remove from superview and self
         springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+
+            [self enableScrollView:viewController.view];
 
             if (completed) {
                 [viewController.view removeFromSuperview];
@@ -301,10 +306,10 @@
     BOOL gestureIsNavigational = fabsf(gestureVelocity.y) > fabsf(gestureVelocity.x);
 
     // Check if visible view is scroll view and let that help determine if gesture is navigational
-    if ([self visibleViewIsScrollView]) {
+    if ([self viewIsScrollView:viewController.view]) {
 
         // Visible view is scroll view, add isScrolledToTop to navigation boolean
-        gestureIsNavigational = gestureIsNavigational && [self visibleViewIsScrolledToTop];
+        gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:viewController.view];
 
     }
 
@@ -325,20 +330,36 @@
     return pointWithinHorizontalBounds && pointWithinVerticalBounds;
 }
 
-- (BOOL)visibleViewIsScrollView
+- (BOOL)viewIsScrollView:(UIView *)view
 {
     // Returns true if visible view is scroll view
-    return [[self visibleViewController].view isKindOfClass:[UIScrollView class]];
+    return [view isKindOfClass:[UIScrollView class]];
 }
 
-- (BOOL)visibleViewIsScrolledToTop
+- (void)disableScrollView:(UIView *)view
+{
+    if ([self viewIsScrollView:view]) {
+        UIScrollView *scrollView = (UIScrollView *)view;
+        scrollView.scrollEnabled = false;
+    }
+}
+
+- (void)enableScrollView:(UIView *)view
+{
+    if ([self viewIsScrollView:view]) {
+        UIScrollView *scrollView = (UIScrollView *)view;
+        scrollView.scrollEnabled = true;
+    }
+}
+
+- (BOOL)scrollViewIsScrolledToTop:(UIView *)view
 {
 
     // Check if visible view is scroll view or subclass thereof
-    if ([[self visibleViewController].view isKindOfClass:[UIScrollView class]]) {
+    if ([self viewIsScrollView:view]) {
 
         // Cast visible view into scrollView to be able to check contentOffset
-        UIScrollView *scrollView = (UIScrollView *)[self visibleViewController].view;
+        UIScrollView *scrollView = (UIScrollView *)view;
 
         // Returns true if scroll view is scrolled to top
         return scrollView.contentOffset.y <= 0;
