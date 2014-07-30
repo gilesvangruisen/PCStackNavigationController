@@ -12,7 +12,7 @@
 @implementation PCStackNavigationController
 
 #define SPRING_BOUNCINESS 1
-#define SPRING_SPEED 4
+#define SPRING_SPEED 6
 #define DISMISS_VELOCITY_THRESHOLD 150
 
 
@@ -151,6 +151,7 @@
                 // Gesture is indeed navigational, handle gesture
                 [self centerView:viewController.view onGesture:gesture];
 
+                [self updateStatusBar];
             }
 
             break;
@@ -222,17 +223,6 @@
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
 
-        // Get previous view controller, aka potential new top view controller
-        int previousViewControllerIndex = [self.childViewControllers indexOfObject:viewController] - 1;
-
-        // Check previous view controller exists
-        if (self.childViewControllers.count >= previousViewControllerIndex) {
-
-            // Begin status bar update
-            [self updateStatusBarWithViewController:[self.childViewControllers objectAtIndex:previousViewControllerIndex]];
-
-        }
-
         // On completion, remove from superview and self
         springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
 
@@ -245,11 +235,6 @@
                 // Not interrupted, remove from super view and self
                 [viewController.view removeFromSuperview];
                 [viewController removeFromParentViewController];
-
-            } else {
-
-                // Animation interrupted, revert status bar
-                [self updateStatusBarWithViewController:viewController];
 
             }
 
@@ -264,7 +249,7 @@
 
     // Finally, add the animation to the viewController
     [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.navigate"];
-
+    [self updateStatusBar];
 }
 
 
@@ -508,22 +493,91 @@
     #pragma clang diagnostic pop
 }
 
+- (void)updateStatusBar {
+
+    // Get reverse enumerator for childViewControllers
+    NSEnumerator *childViewControllerEnumerator = [self.childViewControllers reverseObjectEnumerator];
+
+    // Empty childViewController to be set
+    UIViewController<PCStackViewController> *childViewController;
+
+    // Empty previousViewController to be set
+    UIViewController<PCStackViewController> *previousViewController;
+
+    // Enumerate!
+    while(childViewController = [childViewControllerEnumerator nextObject]) {
+
+        // Set previousViewController
+        previousViewController = [self viewControllerBeforeViewController:childViewController];
+
+        // Array of pop animation keys to check
+        NSArray *popAnimationKeys = childViewController.view.layer.pop_animationKeys;
+
+        if (popAnimationKeys.count > 0) {
+
+            // There's an animation in progress, fetch it
+            POPSpringAnimation *springAnimation = [childViewController.view.layer pop_animationForKey:popAnimationKeys[0]];
+
+            // Check view controller is not on its way to resting
+            if (![springAnimation.toValue isEqual:@([self restingCenterForViewController:childViewController].y)] && previousViewController) {
+
+                // Not on the way to resting, use previous view controller
+                childViewController = previousViewController;
+                break;
+
+            } else {
+
+                // Either on its way to resting or no previousViewController, break and use current
+                break;
+
+            }
+
+        } else if (childViewController.view.frame.origin.y > 20 && previousViewController) {
+
+
+            // Revealing and previousViewController exists, use it and break
+            childViewController = previousViewController;
+            break;
+
+        } else {
+
+            // Not revealing or animating, break and use current
+            break;
+
+        }
+    }
+
+    if (childViewController) {
+        // Update status bar with childViewController
+        [self updateStatusBarWithViewController:childViewController];
+    }
+}
+
+
+- (UIViewController<PCStackViewController> *)viewControllerBeforeViewController:(UIViewController<PCStackViewController> *)viewController {
+
+    // Init empty previousViewController
+    UIViewController<PCStackViewController> *previousViewController;
+
+    // Index of previous view controller
+    int previousViewControllerIndex = [self.childViewControllers indexOfObject:viewController] - 1;
+
+    // View controller is revealing previous
+    if (self.childViewControllers.count > previousViewControllerIndex) {
+
+        // View controller underneath exists, use it to update status bar
+        previousViewController = [self.childViewControllers objectAtIndex:previousViewControllerIndex];
+
+    }
+
+    return previousViewController;
+}
+
 
 #pragma mark etc.
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return YES;
 }
-
-
-- (UIViewController *)childViewControllerForStatusBarHidden {
-    return self.topViewController;
-}
-
-
-- (UIViewController *)childViewControllerForStatusBarStyle {
-    return self.topViewController;
-}
-
 
 @end
