@@ -70,6 +70,7 @@
 
 @protocol PCStackViewController <NSObject>
 
+
 @required
 
 // Returns the stack controller to which the view controller belongs
@@ -77,5 +78,11 @@
 
 // Returns the index of the view controller
 @property (nonatomic) NSInteger stackIndex;
+
+
+@optional
+
+// If implemented, this method will be called on a view controller being pushed or the new top view controller after another has been popped
+- (void)updateStatusBar;
 
 @end

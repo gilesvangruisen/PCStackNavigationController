@@ -61,6 +61,8 @@
     [self.view insertSubview:_bottomViewController.view atIndex:0];
     [_bottomViewController didMoveToParentViewController:self];
 
+    [self updateStatusBarWithViewController:_bottomViewController];
+
     // bottomViewController now contained by self
     [self.bottomViewController didMoveToParentViewController:self];
 
@@ -105,6 +107,9 @@
     static UIViewController<PCStackViewController> *viewController;
     static CGPoint originalCenter;
     static BOOL gestureIsNavigational = false;
+
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wswitch"
 
     switch (gesture.state) {
 
@@ -163,7 +168,22 @@
 
             break;
         }
+
+        case UIGestureRecognizerStateCancelled: {
+
+            if (gestureIsNavigational) {
+
+                // Gesture is indeed navigational, handle gesture ended
+                [self handleNavigationGestureEnded:gesture withOriginalCenter:originalCenter viewController:viewController];
+                viewController = nil;
+
+            }
+
+            break;
+        }
     }
+    #pragma clang diagnostic pop
+
 }
 
 
@@ -202,14 +222,35 @@
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
 
+        // Get previous view controller, aka potential new top view controller
+        int previousViewControllerIndex = [self.childViewControllers indexOfObject:viewController] - 1;
+
+        // Check previous view controller exists
+        if (self.childViewControllers.count >= previousViewControllerIndex) {
+
+            // Begin status bar update
+            [self updateStatusBarWithViewController:[self.childViewControllers objectAtIndex:previousViewControllerIndex]];
+
+        }
+
         // On completion, remove from superview and self
         springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
 
+            // Upon completion, re-enable scroll view
             [self enableScrollView:viewController.view];
 
+            // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
+
+                // Not interrupted, remove from super view and self
                 [viewController.view removeFromSuperview];
                 [viewController removeFromParentViewController];
+
+            } else {
+
+                // Animation interrupted, revert status bar
+                [self updateStatusBarWithViewController:viewController];
+
             }
 
         };
@@ -221,6 +262,7 @@
 
     }
 
+    // Finally, add the animation to the viewController
     [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.navigate"];
 
 }
@@ -250,8 +292,12 @@
 
         // Build spring animation to animate incoming into view
         POPSpringAnimation *springEnterAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+
+        // Set spring animation bounciness and speed to stackNav defaults
         springEnterAnimation.springBounciness = SPRING_BOUNCINESS;
         springEnterAnimation.springSpeed = SPRING_SPEED;
+
+        // To value is resting center view incoming view controller
         springEnterAnimation.toValue = @([self restingCenterForViewController:incomingViewController].y);
 
         // Add spring enter animation to incoming view controller
@@ -262,8 +308,11 @@
         // Add incoming to view controller stack
         [self addChildViewController:incomingViewController];
 
+        // Not animated so make sure frame (spec. origin) is correct upon adding as subview
         CGRect viewFrame = incomingViewController.view.frame;
         viewFrame.origin.y = [self restingCenterForViewController:incomingViewController].y - (viewFrame.size.height / 2);
+
+        // Set frame with proper origin
         incomingViewController.view.frame = viewFrame;
 
         // Add incoming as visible subview
@@ -275,6 +324,8 @@
 
     // Incoming moved to parent
     [incomingViewController didMoveToParentViewController:self];
+
+    [self updateStatusBarWithViewController:incomingViewController];
 
 }
 
@@ -333,9 +384,14 @@
 
 
 - (BOOL)point:(CGPoint)point isWithinBounds:(CGRect)bounds {
+
+    // point.x is between origin.x and corrected size.width (accounting for origin.x possibly not being 0)
     BOOL pointWithinHorizontalBounds = point.x >= bounds.origin.x && point.x <= bounds.origin.x + bounds.size.width;
+
+    // point.y is between origin.y and corrected size.height (accounting for origin.y possibly not being 0)
     BOOL pointWithinVerticalBounds = point.y >= bounds.origin.y && point.y <= bounds.origin.y + bounds.size.height;
 
+    // Combine and return bools
     return pointWithinHorizontalBounds && pointWithinVerticalBounds;
 }
 
@@ -347,38 +403,62 @@
 
 
 - (BOOL)scrollViewContentIsTallerThanFrame:(UIView *)view {
+
+    // First ensure view is a scroll view
     if ([self viewIsScrollView:view]) {
+
+        // View is scroll view, cast as such and return boolean height check
         UIScrollView *scrollView = (UIScrollView *)view;
+
         return scrollView.contentSize.height > scrollView.frame.size.height;
+
     } else {
+
+        // Not a scroll view
         return false;
+
     }
+
 }
 
 
 - (void)disableScrollView:(UIView *)view {
+
+    // First ensure view is scroll view
     if ([self viewIsScrollView:view]) {
+
+        // View is scroll view, cast as such
         UIScrollView *scrollView = (UIScrollView *)view;
+
+        // Scroll to top and disable
         scrollView.contentOffset = CGPointMake(0, 0);
         scrollView.scrollEnabled = false;
+
     }
 }
 
 
 - (void)enableScrollView:(UIView *)view {
+
+    // First ensure view is scroll view
     if ([self viewIsScrollView:view]) {
+
+        // View is scroll view, cast as such
         UIScrollView *scrollView = (UIScrollView *)view;
+
+        // Enable scroll view
         scrollView.scrollEnabled = true;
+
     }
 }
 
 
 - (BOOL)scrollViewIsScrolledToTop:(UIView *)view {
 
-    // Check if visible view is scroll view or subclass thereof
+    // First ensure view is scroll view
     if ([self viewIsScrollView:view]) {
 
-        // Cast visible view into scrollView to be able to check contentOffset
+        // View is scroll view, cast as such
         UIScrollView *scrollView = (UIScrollView *)view;
 
         // Returns true if scroll view is scrolled to top
@@ -386,7 +466,7 @@
 
     } else {
 
-        // Not scroll view ergo cannot be scrolled to top
+        // Not a scroll view
         return false;
 
     }
@@ -394,15 +474,39 @@
 
 
 - (CGPoint)restingCenterForViewController:(UIViewController *)viewController {
-    if (viewController.view.frame.size.height == self.view.frame.size.height - 20) {
-        NSLog(@"1");
-        return CGPointMake(self.view.center.x, self.view.center.y + 10);
+
+    // Check the height of the viewController's view
+    if (viewController.view.frame.size.height == self.view.frame.size.height) {
+
+        // viewController.view's height matches self.view's height, resting center is self.view.center
+        return self.view.center;
+
     } else {
-        NSLog(@"2");
-        return CGPointMake(self.view.center.x, self.view.center.y);
+
+        // viewController.view's height does not match self.view's height, we can assume only
+        // other possibility is 20px smaller so resting center should account for status bar
+        return CGPointMake(self.view.center.x, self.view.center.y + 10);
+
     }
 }
 
+
+- (void)updateStatusBarWithViewController:(UIViewController <PCStackViewController> *)viewController {
+
+    // Ignore undeclared selector (only in this method) because we're checking for it before any call is made
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wundeclared-selector"
+
+    // Check if view controller has implemented updateStatusBar
+    if ([viewController respondsToSelector:@selector(updateStatusBar)]) {
+
+        // View controller implements updateStatusBar, call it
+        [viewController performSelector:@selector(updateStatusBar)];
+
+    }
+
+    #pragma clang diagnostic pop
+}
 
 
 #pragma mark etc.
