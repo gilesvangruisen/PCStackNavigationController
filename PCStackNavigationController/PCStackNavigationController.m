@@ -11,7 +11,7 @@
 
 @implementation PCStackNavigationController
 
-#define SPRING_BOUNCINESS 4
+#define SPRING_BOUNCINESS 1
 #define SPRING_SPEED 4
 #define DISMISS_VELOCITY_THRESHOLD 150
 
@@ -193,7 +193,7 @@
         } else {
 
             // No bottomViewController, return to visible center
-            springAnimation.toValue = @(self.view.center.y);
+            springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
 
         }
 
@@ -217,7 +217,7 @@
     } else {
 
         // Velocity is negative and below threshold (upward "throw" swipe)
-        springAnimation.toValue = @(self.view.center.y);
+        springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
 
     }
 
@@ -252,7 +252,7 @@
         POPSpringAnimation *springEnterAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
         springEnterAnimation.springBounciness = SPRING_BOUNCINESS;
         springEnterAnimation.springSpeed = SPRING_SPEED;
-        springEnterAnimation.toValue = @(self.view.center.y);
+        springEnterAnimation.toValue = @([self restingCenterForViewController:incomingViewController].y);
 
         // Add spring enter animation to incoming view controller
         [incomingViewController.view.layer pop_addAnimation:springEnterAnimation forKey:@"stackNav.enter"];
@@ -261,6 +261,10 @@
 
         // Add incoming to view controller stack
         [self addChildViewController:incomingViewController];
+
+        CGRect viewFrame = incomingViewController.view.frame;
+        viewFrame.origin.y = [self restingCenterForViewController:incomingViewController].y - (viewFrame.size.height / 2);
+        incomingViewController.view.frame = viewFrame;
 
         // Add incoming as visible subview
         [self.view addSubview:incomingViewController.view];
@@ -387,6 +391,18 @@
 
     }
 }
+
+
+- (CGPoint)restingCenterForViewController:(UIViewController *)viewController {
+    if (viewController.view.frame.size.height == self.view.frame.size.height - 20) {
+        NSLog(@"1");
+        return CGPointMake(self.view.center.x, self.view.center.y + 10);
+    } else {
+        NSLog(@"2");
+        return CGPointMake(self.view.center.x, self.view.center.y);
+    }
+}
+
 
 
 #pragma mark etc.
