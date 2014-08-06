@@ -359,6 +359,11 @@
         }
     }
 
+    // Check if viewController implements allowsNavigation and include
+    if ([viewController respondsToSelector:@selector(allowsNavigation)]) {
+        gestureIsNavigational = gestureIsNavigational && [viewController allowsNavigation];
+    }
+
     // Check that we're not trying to navigate the root view controller
     gestureIsNavigational = gestureIsNavigational && viewController.stackIndex > 0;
 
