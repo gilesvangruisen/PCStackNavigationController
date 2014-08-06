@@ -318,6 +318,47 @@
 
 - (void)popViewControllerAnimated:(BOOL)animated {
 
+    // Grab top view controller to be dismissed
+    UIViewController<PCStackViewController> *viewController = self.topViewController;
+
+    if (animated) {
+
+        // Remove from superview
+        [viewController.view removeFromSuperview];
+
+        // Remove from parent
+        [viewController removeFromParentViewController];
+
+    } else {
+
+        // Spring animation
+        POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+        springAnimation.springBounciness = 0;
+        springAnimation.springSpeed = SPRING_SPEED;
+
+        // Dismiss view gesture, send it off screen
+        springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+
+        // On completion, remove from superview and self
+        springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+
+            // Upon completion, re-enable scroll view
+            [self enableScrollView:viewController.view];
+
+            // Check that animation successfully completed (wasn't interrupted by another gesture)
+            if (completed) {
+
+                // Not interrupted, remove from super view and self
+                [viewController.view removeFromSuperview];
+                [viewController removeFromParentViewController];
+
+            }
+
+        };
+
+        // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
+        [viewController.view pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+    }
 }
 
 
@@ -363,6 +404,9 @@
     if ([viewController respondsToSelector:@selector(allowsNavigation)]) {
         gestureIsNavigational = gestureIsNavigational && [viewController allowsNavigation];
     }
+
+    // Check if view controller view has pop_animation of key stackNav.dismiss and if so, don't allow nav
+    gestureIsNavigational = gestureIsNavigational && ![[viewController.view pop_animationKeys] containsObject:@"stackNav.dismiss"];
 
     // Check that we're not trying to navigate the root view controller
     gestureIsNavigational = gestureIsNavigational && viewController.stackIndex > 0;
