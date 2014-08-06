@@ -323,14 +323,6 @@
 
     if (animated) {
 
-        // Remove from superview
-        [viewController.view removeFromSuperview];
-
-        // Remove from parent
-        [viewController removeFromParentViewController];
-
-    } else {
-
         // Spring animation
         POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
         springAnimation.springBounciness = 0;
@@ -358,6 +350,15 @@
 
         // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
         [viewController.view pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+
+    } else {
+
+        // Remove from superview
+        [viewController.view removeFromSuperview];
+
+        // Remove from parent
+        [viewController removeFromParentViewController];
+
     }
 }
 
