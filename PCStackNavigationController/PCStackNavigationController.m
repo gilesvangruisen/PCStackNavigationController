@@ -611,7 +611,7 @@
     UIViewController<PCStackViewController> *previousViewController;
 
     // Index of previous view controller
-    int previousViewControllerIndex = [self.childViewControllers indexOfObject:viewController] - 1;
+    NSUInteger previousViewControllerIndex = [self.childViewControllers indexOfObject:viewController] - 1;
 
     // View controller is revealing previous
     if (self.childViewControllers.count > previousViewControllerIndex) {
