@@ -344,6 +344,7 @@
                 // Not interrupted, remove from super view and self
                 [viewController.view removeFromSuperview];
                 [viewController removeFromParentViewController];
+                [self.topViewController viewDidAppear:YES];
 
             }
 
