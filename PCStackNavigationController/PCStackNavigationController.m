@@ -322,6 +322,18 @@
     // Grab top view controller to be dismissed
     UIViewController<PCStackViewController> *viewController = self.topViewController;
 
+    // Get the view controller below it too
+    NSInteger belowIndex = self.topViewController.stackIndex - 1;
+
+    if (belowIndex >= 0) {
+        UIViewController<PCStackViewController> *belowViewController = [self.childViewControllers objectAtIndex:belowIndex];
+
+        // See if we can send it a viewWillAppear so it knows it's about to appear again
+        if ([belowViewController respondsToSelector:@selector(viewWillReappear:)]) {
+            [belowViewController viewWillReappear:YES];
+        }
+    }
+
     if (animated) {
 
         // Spring animation
