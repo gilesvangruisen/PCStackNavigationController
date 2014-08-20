@@ -138,6 +138,11 @@
                 // Disable scroll if visible view is scroll view
                 [self disableScrollView:viewController.view];
 
+                // Check for other scroll view and disable
+                if ([viewController respondsToSelector:@selector(scrollView)]) {
+                    [self disableScrollView:viewController.scrollView];
+                }
+
                 [self centerView:viewController.view onGesture:gesture];
 
             }
@@ -199,6 +204,10 @@
     springAnimation.velocity = @(velocity.y);
     springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
         [self enableScrollView:viewController.view];
+        // Check for any other scroll view and re-enable that, too
+        if ([viewController respondsToSelector:@selector(scrollView)]) {
+            [self enableScrollView:viewController.scrollView];
+        }
     };
 
     if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex <= 0) {
@@ -229,6 +238,11 @@
 
             // Upon completion, re-enable scroll view
             [self enableScrollView:viewController.view];
+
+            // Check for any other scroll view and re-enable that, too
+            if ([viewController respondsToSelector:@selector(scrollView)]) {
+                [self enableScrollView:viewController.scrollView];
+            }
 
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
@@ -338,6 +352,11 @@
             // Upon completion, re-enable scroll view
             [self enableScrollView:viewController.view];
 
+            // Check for any other scroll view and re-enable that, too
+            if ([viewController respondsToSelector:@selector(scrollView)]) {
+                [self enableScrollView:viewController.scrollView];
+            }
+
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
 
@@ -401,6 +420,16 @@
         if ([self scrollViewContentIsTallerThanFrame:viewController.view]) {
             gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:viewController.view] && gestureVelocity.y > 0;
         }
+
+    } else if ([viewController respondsToSelector:@selector(scrollView)]) {
+
+        UIScrollView *scrollView = [viewController scrollView];
+
+        // View is scroll view, add isScrolledToTop if content taller than frame and velocity > 0
+        if ([self scrollViewContentIsTallerThanFrame:scrollView]) {
+            gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:scrollView] && gestureVelocity.y > 0;
+        }
+
     }
 
     // Check if viewController implements allowsNavigation and include
@@ -469,7 +498,7 @@
         UIScrollView *scrollView = (UIScrollView *)view;
 
         // Scroll to top and disable
-        scrollView.contentOffset = CGPointMake(0, 0);
+        scrollView.contentOffset = CGPointMake(-scrollView.contentInset.left, -scrollView.contentInset.top);
         scrollView.scrollEnabled = false;
 
     }

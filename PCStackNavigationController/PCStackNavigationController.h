@@ -82,6 +82,9 @@
 
 @optional
 
+// If implemented, this scroll view will help determine if a gesture is navigational
+@property (nonatomic, strong) UIScrollView *scrollView;
+
 // If implemented, this method will be called on a view controller being pushed or the new top view controller after another has been popped
 - (void)updateStatusBar;
 
