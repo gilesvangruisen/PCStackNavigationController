@@ -412,7 +412,13 @@
         // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
         [viewController.view pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
 
+        // Update scale and opacity of previous vc animated
+        [self updatePreviousViewWithOpacity:1 scale:1 animated:YES];
+
     } else {
+
+        // Don't animate but go immediately
+        [self updatePreviousViewWithOpacity:1 scale:1 animated:NO];
 
         // Remove from superview
         [viewController.view removeFromSuperview];
