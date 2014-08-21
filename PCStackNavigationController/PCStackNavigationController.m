@@ -14,7 +14,8 @@
 #define SPRING_BOUNCINESS 1
 #define SPRING_SPEED 6
 #define DISMISS_VELOCITY_THRESHOLD 150
-
+#define DOWN_SCALE 0.95
+#define DOWN_OPACITY 0.8
 
 #pragma mark initialization
 
@@ -82,8 +83,19 @@
     }
 
     // Calculate new center based on original + translation
-    CGFloat newCenterY = originalCenter.y + [gesture translationInView:self.view].y;
-    view.center = CGPointMake(originalCenter.x, newCenterY);
+    CGPoint newCenter = [self newCenterWithOriginalCenter:originalCenter translation:[gesture translationInView:self.view]];
+    view.center = newCenter;
+}
+
+
+- (CGPoint)newCenterWithOriginalCenter:(CGPoint)original translation:(CGPoint)translation {
+
+    CGPoint newCenter = original;
+
+    // Add translation y to original y
+    newCenter.y += translation.y;
+
+    return newCenter;
 }
 
 
@@ -156,6 +168,13 @@
                 // Gesture is indeed navigational, handle gesture
                 [self centerView:viewController.view onGesture:gesture];
 
+                CGFloat progress = [self trackingProgressWithPosition:viewController.view.center.y start:self.view.frame.size.height / 2 end:self.view.frame.size.height * 1.5];
+
+                CGFloat newPrevOpacity = [self positionWithProgress:progress start:DOWN_OPACITY end:1];
+                CGFloat newPrevScale = [self positionWithProgress:progress start:DOWN_SCALE end:1];
+
+                [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:NO];
+
                 [self updateStatusBar];
             }
 
@@ -197,6 +216,10 @@
     // Grab velocity and location from gesture
     CGPoint velocity = [gesture velocityInView:self.view];
 
+    // Prev view
+    CGFloat newPrevOpacity;
+    CGFloat newPrevScale;
+
     // Spring animation
     POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
     springAnimation.springBounciness = SPRING_BOUNCINESS;
@@ -222,6 +245,9 @@
 
         } else {
 
+            newPrevOpacity = DOWN_OPACITY;
+            newPrevScale = DOWN_SCALE;
+
             // No bottomViewController, return to visible center
             springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
 
@@ -232,6 +258,9 @@
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
         springAnimation.springBounciness = 0;
+
+        newPrevOpacity = 1;
+        newPrevScale = 1;
 
         // On completion, remove from superview and self
         springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
@@ -258,9 +287,16 @@
 
     } else {
 
+        newPrevOpacity = DOWN_OPACITY;
+        newPrevScale = DOWN_SCALE;
+
         // Velocity is negative and below threshold (upward "throw" swipe)
         springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
 
+    }
+
+    if (newPrevScale && newPrevOpacity) {
+        [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:YES];
     }
 
     // Finally, add the animation to the viewController
@@ -304,6 +340,8 @@
         // Add spring enter animation to incoming view controller
         [incomingViewController.view.layer pop_addAnimation:springEnterAnimation forKey:@"stackNav.enter"];
 
+        [self updatePreviousViewWithOpacity:DOWN_OPACITY scale:DOWN_SCALE animated:YES];
+
     } else {
 
         // Add incoming to view controller stack
@@ -320,6 +358,8 @@
         [self.view addSubview:incomingViewController.view];
 
         [incomingViewController didMoveToParentViewController:self];
+
+        [self updatePreviousViewWithOpacity:DOWN_OPACITY scale:DOWN_SCALE animated:NO];
 
     }
 
@@ -486,6 +526,39 @@
 
     }
 
+}
+
+
+- (void)updatePreviousViewWithOpacity:(CGFloat)opacity scale:(CGFloat)scale animated:(BOOL)animated {
+
+    if (self.childViewControllers.count > 1 && ![self.topViewController.view.layer pop_animationForKey:@"stackNav.navigate"]) {
+
+        UIViewController *viewController = [self.childViewControllers objectAtIndex:self.childViewControllers.count - 2];
+        [viewController.view.layer pop_removeAllAnimations];
+
+        if (animated) {
+
+            // Opacity animation
+            POPBasicAnimation *opacityAnimation = [POPBasicAnimation animationWithPropertyNamed:kPOPLayerOpacity];
+            opacityAnimation.toValue = @(opacity);
+            [viewController.view.layer pop_addAnimation:opacityAnimation forKey:@"previousVC.fade"];
+
+            // Scale aniamtion, bounce
+            POPSpringAnimation *scaleAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerScaleXY];
+            scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
+            [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
+
+        } else {
+
+            // Set opacity
+            viewController.view.layer.opacity = opacity;
+
+            // Transform view for scale
+            CGAffineTransform transform = CGAffineTransformMakeScale(scale, scale);
+            viewController.view.transform = transform;
+
+        }
+    }
 }
 
 
@@ -660,6 +733,33 @@
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return YES;
+}
+
+- (CGFloat)trackingProgressWithPosition:(CGFloat)position start:(CGFloat)start end:(CGFloat)end {
+    // Get offset starting at zero
+    CGFloat offset = position - start;
+    // Max offset from zero
+    CGFloat maxOffset = end / 2;
+    // Progress of offset between zero and max offset, capped at one
+    CGFloat progress = fmaxf(fminf(offset / maxOffset, 1), 0);
+
+    return progress;
+}
+
+- (CGFloat)positionWithProgress:(CGFloat)progress start:(CGFloat)start end:(CGFloat)end {
+    // Get total distance
+    CGFloat distance = end - start;
+    // Position accounting for offset
+    CGFloat position = (progress * distance) + start;
+    return position;
+}
+
+#pragma mark Math
+
+- (CGFloat)smoothStep:(CGFloat)value {
+    // Smoothstep = x^2 • (3 - 2x)
+    CGFloat smoothstep = powf(value, 2) * (3 - 2 * value);
+    return smoothstep;
 }
 
 @end
