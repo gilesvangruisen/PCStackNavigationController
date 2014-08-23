@@ -488,6 +488,14 @@
             gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:scrollView] && gestureVelocity.y > 0;
         }
 
+        CGPoint locationInView = [gesture locationInView:viewController.view];
+        UIView *targetView = [viewController.view hitTest:locationInView withEvent:nil];
+
+        // Don't allow scrolling in the scroll view
+        if ([targetView isDescendantOfView:scrollView]) {
+            gestureIsNavigational = NO;
+        }
+
     }
 
     // Check if viewController implements allowsNavigation and include
