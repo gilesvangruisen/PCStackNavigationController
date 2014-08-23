@@ -82,6 +82,9 @@
 
 @optional
 
+// If implemented, this scroll view will help determine if a gesture is navigational
+@property (nonatomic, strong) UIScrollView *scrollView;
+
 // If present this will be called when the view controller is about to reappear
 // on the stack after the view controller above it was popped
 - (void)viewWillReappear:(BOOL)animated;
