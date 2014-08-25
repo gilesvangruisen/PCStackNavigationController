@@ -454,8 +454,10 @@
     // Check for navigationHandle
     if ([viewController respondsToSelector:@selector(navigationHandle)]) {
 
+        CGPoint gestureLocationInViewController = [gesture locationInView:viewController.view];
+
         // <PCStackViewController> has navigationHandle, ensure gesture is within its bounds. If not, gestureIsNavigation = false
-        if (![self point:gestureLocation isWithinBounds:viewController.navigationHandle.frame]) {
+        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle.frame]) {
             gestureIsNavigational = false;
         }
 
