@@ -85,10 +85,17 @@
 // If implemented, this scroll view will help determine if a gesture is navigational
 @property (nonatomic, strong) UIScrollView *scrollView;
 
-// If implemented, this method will be called on a view controller being pushed or the new top view controller after another has been popped
+// If present this will be called when the view controller is about to reappear
+// on the stack after the view controller above it was popped
+- (void)viewWillReappear:(BOOL)animated;
+
+// If implemented, this method will be called on a view controller being pushed
+// or the new top view controller after another has been popped
 - (void)updateStatusBar;
 
-// If implemented, this method will determine whether or not a navigation gesture will have any affect on the implementing view controller, true to allow, false to disable
+// If implemented, this method will determine whether or not a navigation
+// gesture will have any affect on the implementing view controller, true to
+// allow, false to disable
 - (BOOL)allowsNavigation;
 
 @end

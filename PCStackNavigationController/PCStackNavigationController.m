@@ -376,6 +376,18 @@
     // Grab top view controller to be dismissed
     UIViewController<PCStackViewController> *viewController = self.topViewController;
 
+    // Get the view controller below it too
+    NSInteger belowIndex = self.topViewController.stackIndex - 1;
+
+    if (belowIndex >= 0) {
+        UIViewController<PCStackViewController> *belowViewController = [self.childViewControllers objectAtIndex:belowIndex];
+
+        // See if we can send it a viewWillAppear so it knows it's about to appear again
+        if ([belowViewController respondsToSelector:@selector(viewWillReappear:)]) {
+            [belowViewController viewWillReappear:YES];
+        }
+    }
+
     if (animated) {
 
         // Spring animation
@@ -474,6 +486,14 @@
         // View is scroll view, add isScrolledToTop if content taller than frame and velocity > 0
         if ([self scrollViewContentIsTallerThanFrame:scrollView]) {
             gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:scrollView] && gestureVelocity.y > 0;
+        }
+
+        CGPoint locationInView = [gesture locationInView:viewController.view];
+        UIView *targetView = [viewController.view hitTest:locationInView withEvent:nil];
+
+        // Don't allow scrolling in the scroll view
+        if ([targetView isDescendantOfView:scrollView]) {
+            gestureIsNavigational = NO;
         }
 
     }
