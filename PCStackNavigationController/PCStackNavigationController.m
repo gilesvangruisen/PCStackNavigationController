@@ -152,7 +152,7 @@
 
                 // Check for other scroll view and disable
                 if ([viewController respondsToSelector:@selector(scrollView)]) {
-                    [self disableScrollView:viewController.scrollView];
+                    [self disableScrollView:[viewController scrollView]];
                 }
 
                 [self centerView:viewController.view onGesture:gesture];
@@ -226,11 +226,14 @@
     springAnimation.springSpeed = SPRING_SPEED;
     springAnimation.velocity = @(velocity.y);
     springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+
         [self enableScrollView:viewController.view];
+
         // Check for any other scroll view and re-enable that, too
         if ([viewController respondsToSelector:@selector(scrollView)]) {
             [self enableScrollView:viewController.scrollView];
         }
+
     };
 
     if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex <= 0) {
@@ -270,7 +273,7 @@
 
             // Check for any other scroll view and re-enable that, too
             if ([viewController respondsToSelector:@selector(scrollView)]) {
-                [self enableScrollView:viewController.scrollView];
+                [self enableScrollView:[viewController scrollView]];
             }
 
             // Check that animation successfully completed (wasn't interrupted by another gesture)
@@ -319,6 +322,10 @@
 
     if (animated) {
 
+        // Disable UI during transition
+        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
+        self.view.userInteractionEnabled = false;
+
         // Animated, ensure initial frame is offscreen
         CGRect offScreenFrame = incomingViewController.view.frame;
         offScreenFrame.origin.y = self.view.frame.size.height;
@@ -333,6 +340,12 @@
         // Set spring animation bounciness and speed to stackNav defaults
         springEnterAnimation.springBounciness = SPRING_BOUNCINESS;
         springEnterAnimation.springSpeed = SPRING_SPEED;
+
+        // Re-enabled previous upon completion
+        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
+        springEnterAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+            self.view.userInteractionEnabled = true;
+        };
 
         // To value is resting center view incoming view controller
         springEnterAnimation.toValue = @([self restingCenterForViewController:incomingViewController].y);
@@ -493,7 +506,7 @@
 
         // Don't allow scrolling in the scroll view
         if ([targetView isDescendantOfView:scrollView]) {
-            gestureIsNavigational = NO;
+//            gestureIsNavigational = false;
         }
 
     }
@@ -571,6 +584,8 @@
 
             // Scale aniamtion, bounce
             POPSpringAnimation *scaleAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerScaleXY];
+            scaleAnimation.springBounciness = SPRING_BOUNCINESS;
+            scaleAnimation.springSpeed = SPRING_SPEED;
             scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
             [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
 
@@ -597,7 +612,7 @@
         UIScrollView *scrollView = (UIScrollView *)view;
 
         // Scroll to top and disable
-        scrollView.contentOffset = CGPointMake(-scrollView.contentInset.left, -scrollView.contentInset.top);
+        scrollView.contentOffset = CGPointMake(scrollView.contentOffset.x, -scrollView.contentInset.top);
         scrollView.scrollEnabled = false;
 
     }
