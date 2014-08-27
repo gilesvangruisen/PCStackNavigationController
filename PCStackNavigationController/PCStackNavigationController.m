@@ -219,27 +219,7 @@
     springAnimation.springSpeed = SPRING_SPEED;
     springAnimation.velocity = @(velocity.y);
 
-    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex <= 0) {
-
-        // Velocity is positive and above threshold (downward "dismiss card" swipe)
-        // Check index and presence of bottom vc
-
-        if (self.bottomViewController) {
-
-            // Bottom view controller exists, reveal it (w/ 80 px of vc still showing)
-            springAnimation.toValue = @((self.view.frame.size.height * 1.5) - 80);
-
-        } else {
-
-            newPrevOpacity = DOWN_OPACITY;
-            newPrevScale = DOWN_SCALE;
-
-            // No bottomViewController, return to visible center
-            springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
-
-        }
-
-    } else if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
+    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
 
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
@@ -263,6 +243,9 @@
 
         };
 
+        // Add the animation
+        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+
     } else {
 
         newPrevOpacity = DOWN_OPACITY;
@@ -271,14 +254,15 @@
         // Velocity is negative and below threshold (upward "throw" swipe)
         springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
 
+        // Add the animation
+        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.flick"];
+
     }
 
     if (newPrevScale && newPrevOpacity) {
         [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:YES];
     }
 
-    // Finally, add the animation to the viewController
-    [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.navigate"];
     [self updateStatusBar];
 }
 
@@ -294,6 +278,9 @@
 
     // Add child view controller to self (calls willMoveToParent)
     [self addChildViewController:incomingViewController];
+
+    // Incoming moved to parent
+    [incomingViewController didMoveToParentViewController:self];
 
     if (animated) {
 
@@ -332,9 +319,6 @@
 
     } else {
 
-        // Add incoming to view controller stack
-        [self addChildViewController:incomingViewController];
-
         // Not animated so make sure frame (spec. origin) is correct upon adding as subview
         CGRect viewFrame = incomingViewController.view.frame;
         viewFrame.origin.y = [self restingCenterForViewController:incomingViewController].y - (viewFrame.size.height / 2);
@@ -350,9 +334,6 @@
         [self updatePreviousViewWithOpacity:DOWN_OPACITY scale:DOWN_SCALE animated:NO];
 
     }
-
-    // Incoming moved to parent
-    [incomingViewController didMoveToParentViewController:self];
 
     [self updateStatusBarWithViewController:incomingViewController];
 
@@ -498,32 +479,60 @@
 
     if (self.childViewControllers.count > 1 && ![self.topViewController.view.layer pop_animationForKey:@"stackNav.navigate"]) {
 
-        UIViewController *viewController = [self.childViewControllers objectAtIndex:self.childViewControllers.count - 2];
-        [viewController.view.layer pop_removeAllAnimations];
+        // The view controller to be updated
+        UIViewController<PCStackViewController> *viewController;
 
-        if (animated) {
+        // Potential to use in nsenum
+        @autoreleasepool {
 
-            // Opacity animation
-            POPBasicAnimation *opacityAnimation = [POPBasicAnimation animationWithPropertyNamed:kPOPLayerOpacity];
-            opacityAnimation.toValue = @(opacity);
-            [viewController.view.layer pop_addAnimation:opacityAnimation forKey:@"previousVC.fade"];
+            // Copy childViewControlelrs mutably so we can pop off the last one
+            NSMutableArray *possibleViewControllers = [self.childViewControllers mutableCopy];
 
-            // Scale aniamtion, bounce
-            POPSpringAnimation *scaleAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerScaleXY];
-            scaleAnimation.springBounciness = SPRING_BOUNCINESS;
-            scaleAnimation.springSpeed = SPRING_SPEED;
-            scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
-            [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
+            // Top vc def can't be "previous"
+            [possibleViewControllers removeLastObject];
 
-        } else {
+            // Enumerate view controllers in reverse order (top to bottom)
+            NSEnumerator *reverseControllerEnumerator = [possibleViewControllers reverseObjectEnumerator];
+            UIViewController<PCStackViewController> *possibleViewController;
+            while (possibleViewController = [reverseControllerEnumerator nextObject]) {
 
-            // Set opacity
-            viewController.view.layer.opacity = opacity;
+                // Fixes corner case where new view controller is pushed before another's dismissal has completed
+                if (![possibleViewController pop_animationForKey:@"stackNav.dismiss"]) {
+                    viewController = possibleViewController;
+                    break;
+                }
 
-            // Transform view for scale
-            CGAffineTransform transform = CGAffineTransformMakeScale(scale, scale);
-            viewController.view.transform = transform;
+            }
+        }
 
+        if (viewController) {
+            // Remove animations before updating
+            [viewController pop_removeAllAnimations];
+
+            if (animated) {
+
+                // Opacity animation
+                POPBasicAnimation *opacityAnimation = [POPBasicAnimation animationWithPropertyNamed:kPOPLayerOpacity];
+                opacityAnimation.toValue = @(opacity);
+                [viewController.view.layer pop_addAnimation:opacityAnimation forKey:@"previousVC.fade"];
+
+                // Scale aniamtion, bounce
+                POPSpringAnimation *scaleAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerScaleXY];
+                scaleAnimation.springBounciness = SPRING_BOUNCINESS;
+                scaleAnimation.springSpeed = SPRING_SPEED;
+                scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
+                [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
+
+            } else {
+
+                // Set opacity
+                viewController.view.layer.opacity = opacity;
+
+                // Transform view for scale
+                CGAffineTransform transform = CGAffineTransformMakeScale(scale, scale);
+                viewController.view.transform = transform;
+
+            }
         }
     }
 }
