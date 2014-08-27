@@ -383,7 +383,7 @@
         };
 
         // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
-        [viewController.view pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
 
         // Update scale and opacity of previous vc animated
         [self updatePreviousViewWithOpacity:1 scale:1 animated:YES];
@@ -497,15 +497,15 @@
             while (possibleViewController = [reverseControllerEnumerator nextObject]) {
 
                 // Fixes corner case where new view controller is pushed before another's dismissal has completed
-                if (![possibleViewController pop_animationForKey:@"stackNav.dismiss"]) {
+                if (![possibleViewController.view.layer pop_animationForKey:@"stackNav.dismiss"]) {
                     viewController = possibleViewController;
                     break;
                 }
-
             }
         }
 
         if (viewController) {
+
             // Remove animations before updating
             [viewController pop_removeAllAnimations];
 
