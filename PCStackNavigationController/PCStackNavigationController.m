@@ -126,7 +126,7 @@
     switch (gesture.state) {
 
         // Gesture just began, determine angle from velocity
-        // Enable interaction, disable scroll if gesture is vertical and (if applicable) only scroll view offset is 0
+        // Find view controller, check navigability,
         case UIGestureRecognizerStateBegan: {
             originalCenter = [gesture locationInView:self.view];
 
@@ -147,14 +147,7 @@
                 // Set static originalCenter
                 originalCenter = viewController.view.center;
 
-                // Disable scroll if visible view is scroll view
-                [self disableScrollView:viewController.view];
-
-                // Check for other scroll view and disable
-                if ([viewController respondsToSelector:@selector(scrollView)]) {
-                    [self disableScrollView:viewController.scrollView];
-                }
-
+                // Reposition controller's view.frame.origin.y according to gesture
                 [self centerView:viewController.view onGesture:gesture];
 
             }
@@ -225,35 +218,8 @@
     springAnimation.springBounciness = SPRING_BOUNCINESS;
     springAnimation.springSpeed = SPRING_SPEED;
     springAnimation.velocity = @(velocity.y);
-    springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
-        [self enableScrollView:viewController.view];
-        // Check for any other scroll view and re-enable that, too
-        if ([viewController respondsToSelector:@selector(scrollView)]) {
-            [self enableScrollView:viewController.scrollView];
-        }
-    };
 
-    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex <= 0) {
-
-        // Velocity is positive and above threshold (downward "dismiss card" swipe)
-        // Check index and presence of bottom vc
-
-        if (self.bottomViewController) {
-
-            // Bottom view controller exists, reveal it (w/ 80 px of vc still showing)
-            springAnimation.toValue = @((self.view.frame.size.height * 1.5) - 80);
-
-        } else {
-
-            newPrevOpacity = DOWN_OPACITY;
-            newPrevScale = DOWN_SCALE;
-
-            // No bottomViewController, return to visible center
-            springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
-
-        }
-
-    } else if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
+    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
 
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
@@ -264,14 +230,6 @@
 
         // On completion, remove from superview and self
         springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
-
-            // Upon completion, re-enable scroll view
-            [self enableScrollView:viewController.view];
-
-            // Check for any other scroll view and re-enable that, too
-            if ([viewController respondsToSelector:@selector(scrollView)]) {
-                [self enableScrollView:viewController.scrollView];
-            }
 
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
@@ -285,6 +243,9 @@
 
         };
 
+        // Add the animation
+        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+
     } else {
 
         newPrevOpacity = DOWN_OPACITY;
@@ -293,14 +254,15 @@
         // Velocity is negative and below threshold (upward "throw" swipe)
         springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
 
+        // Add the animation
+        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.flick"];
+
     }
 
     if (newPrevScale && newPrevOpacity) {
         [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:YES];
     }
 
-    // Finally, add the animation to the viewController
-    [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.navigate"];
     [self updateStatusBar];
 }
 
@@ -317,7 +279,14 @@
     // Add child view controller to self (calls willMoveToParent)
     [self addChildViewController:incomingViewController];
 
+    // Incoming moved to parent
+    [incomingViewController didMoveToParentViewController:self];
+
     if (animated) {
+
+        // Disable UI during transition
+        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
+        self.view.userInteractionEnabled = false;
 
         // Animated, ensure initial frame is offscreen
         CGRect offScreenFrame = incomingViewController.view.frame;
@@ -334,6 +303,24 @@
         springEnterAnimation.springBounciness = SPRING_BOUNCINESS;
         springEnterAnimation.springSpeed = SPRING_SPEED;
 
+        // Re-enabled previous upon completion
+        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
+        springEnterAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+            self.view.userInteractionEnabled = true;
+
+            // Grab previous view controller
+            UIViewController<PCStackViewController> *previousViewController = self.previousViewController;
+
+            // Check a previous view controller exists
+            if (previousViewController) {
+
+                // Previous view controller exists, hide it!
+                [previousViewController.view.layer pop_removeAllAnimations];
+                previousViewController.view.layer.opacity = 0;
+
+            }
+        };
+
         // To value is resting center view incoming view controller
         springEnterAnimation.toValue = @([self restingCenterForViewController:incomingViewController].y);
 
@@ -343,9 +330,6 @@
         [self updatePreviousViewWithOpacity:DOWN_OPACITY scale:DOWN_SCALE animated:YES];
 
     } else {
-
-        // Add incoming to view controller stack
-        [self addChildViewController:incomingViewController];
 
         // Not animated so make sure frame (spec. origin) is correct upon adding as subview
         CGRect viewFrame = incomingViewController.view.frame;
@@ -359,12 +343,9 @@
 
         [incomingViewController didMoveToParentViewController:self];
 
-        [self updatePreviousViewWithOpacity:DOWN_OPACITY scale:DOWN_SCALE animated:NO];
+        [self updatePreviousViewWithOpacity:0 scale:DOWN_SCALE animated:NO];
 
     }
-
-    // Incoming moved to parent
-    [incomingViewController didMoveToParentViewController:self];
 
     [self updateStatusBarWithViewController:incomingViewController];
 
@@ -401,14 +382,6 @@
         // On completion, remove from superview and self
         springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
 
-            // Upon completion, re-enable scroll view
-            [self enableScrollView:viewController.view];
-
-            // Check for any other scroll view and re-enable that, too
-            if ([viewController respondsToSelector:@selector(scrollView)]) {
-                [self enableScrollView:viewController.scrollView];
-            }
-
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
 
@@ -422,7 +395,7 @@
         };
 
         // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
-        [viewController.view pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
 
         // Update scale and opacity of previous vc animated
         [self updatePreviousViewWithOpacity:1 scale:1 animated:YES];
@@ -471,29 +444,14 @@
     // will set to true if gesture is primarily vertical as noted above
     BOOL gestureIsNavigational = fabsf(gestureVelocity.y) > fabsf(gestureVelocity.x);
 
-    // Check if visible view is scroll view and let that help determine if gesture is navigational
-    if ([self viewIsScrollView:viewController.view]) {
+    // Check for navigationHandle
+    if ([viewController respondsToSelector:@selector(navigationHandle)]) {
 
-        // View is scroll view, add isScrolledToTop if content taller than frame and velocity > 0
-        if ([self scrollViewContentIsTallerThanFrame:viewController.view]) {
-            gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:viewController.view] && gestureVelocity.y > 0;
-        }
+        CGPoint gestureLocationInViewController = [gesture locationInView:viewController.view];
 
-    } else if ([viewController respondsToSelector:@selector(scrollView)]) {
-
-        UIScrollView *scrollView = [viewController scrollView];
-
-        // View is scroll view, add isScrolledToTop if content taller than frame and velocity > 0
-        if ([self scrollViewContentIsTallerThanFrame:scrollView]) {
-            gestureIsNavigational = gestureIsNavigational && [self scrollViewIsScrolledToTop:scrollView] && gestureVelocity.y > 0;
-        }
-
-        CGPoint locationInView = [gesture locationInView:viewController.view];
-        UIView *targetView = [viewController.view hitTest:locationInView withEvent:nil];
-
-        // Don't allow scrolling in the scroll view
-        if ([targetView isDescendantOfView:scrollView]) {
-            gestureIsNavigational = NO;
+        // <PCStackViewController> has navigationHandle, ensure gesture is within its bounds. If not, gestureIsNavigation = false
+        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle.frame]) {
+            gestureIsNavigational = false;
         }
 
     }
@@ -529,113 +487,74 @@
 }
 
 
-- (BOOL)viewIsScrollView:(UIView *)view {
-    // Returns true if visible view is scroll view
-    return [view isKindOfClass:[UIScrollView class]];
-}
-
-
-- (BOOL)scrollViewContentIsTallerThanFrame:(UIView *)view {
-
-    // First ensure view is a scroll view
-    if ([self viewIsScrollView:view]) {
-
-        // View is scroll view, cast as such and return boolean height check
-        UIScrollView *scrollView = (UIScrollView *)view;
-
-        return scrollView.contentSize.height > scrollView.frame.size.height;
-
-    } else {
-
-        // Not a scroll view
-        return false;
-
-    }
-
-}
-
-
 - (void)updatePreviousViewWithOpacity:(CGFloat)opacity scale:(CGFloat)scale animated:(BOOL)animated {
 
     if (self.childViewControllers.count > 1 && ![self.topViewController.view.layer pop_animationForKey:@"stackNav.navigate"]) {
 
-        UIViewController *viewController = [self.childViewControllers objectAtIndex:self.childViewControllers.count - 2];
-        [viewController.view.layer pop_removeAllAnimations];
+        UIViewController<PCStackViewController> *viewController = self.previousViewController;
 
-        if (animated) {
+        if (viewController) {
 
-            // Opacity animation
-            POPBasicAnimation *opacityAnimation = [POPBasicAnimation animationWithPropertyNamed:kPOPLayerOpacity];
-            opacityAnimation.toValue = @(opacity);
-            [viewController.view.layer pop_addAnimation:opacityAnimation forKey:@"previousVC.fade"];
+            // Remove animations before updating
+            [viewController pop_removeAllAnimations];
 
-            // Scale aniamtion, bounce
-            POPSpringAnimation *scaleAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerScaleXY];
-            scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
-            [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
+            if (animated) {
 
-        } else {
+                // Opacity animation
+                POPBasicAnimation *opacityAnimation = [POPBasicAnimation animationWithPropertyNamed:kPOPLayerOpacity];
+                opacityAnimation.toValue = @(opacity);
+                [viewController.view.layer pop_addAnimation:opacityAnimation forKey:@"previousVC.fade"];
 
-            // Set opacity
-            viewController.view.layer.opacity = opacity;
+                // Scale aniamtion, bounce
+                POPSpringAnimation *scaleAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerScaleXY];
+                scaleAnimation.springBounciness = SPRING_BOUNCINESS;
+                scaleAnimation.springSpeed = SPRING_SPEED;
+                scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
 
-            // Transform view for scale
-            CGAffineTransform transform = CGAffineTransformMakeScale(scale, scale);
-            viewController.view.transform = transform;
+                [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
 
+            } else {
+
+                // Set opacity
+                viewController.view.layer.opacity = opacity;
+
+                // Transform view for scale
+                CGAffineTransform transform = CGAffineTransformMakeScale(scale, scale);
+                viewController.view.transform = transform;
+
+            }
         }
     }
 }
 
 
-- (void)disableScrollView:(UIView *)view {
+- (UIViewController<PCStackViewController> *)previousViewController {
+    // The view controller to be updated
+    UIViewController<PCStackViewController> *viewController;
 
-    // First ensure view is scroll view
-    if ([self viewIsScrollView:view]) {
+    // Potential to use in nsenum
+    @autoreleasepool {
 
-        // View is scroll view, cast as such
-        UIScrollView *scrollView = (UIScrollView *)view;
+        // Copy childViewControlelrs mutably so we can pop off the last one
+        NSMutableArray *possibleViewControllers = [self.childViewControllers mutableCopy];
 
-        // Scroll to top and disable
-        scrollView.contentOffset = CGPointMake(-scrollView.contentInset.left, -scrollView.contentInset.top);
-        scrollView.scrollEnabled = false;
+        // Top vc def can't be "previous"
+        [possibleViewControllers removeLastObject];
 
+        // Enumerate view controllers in reverse order (top to bottom)
+        NSEnumerator *reverseControllerEnumerator = [possibleViewControllers reverseObjectEnumerator];
+        UIViewController<PCStackViewController> *possibleViewController;
+        while (possibleViewController = [reverseControllerEnumerator nextObject]) {
+
+            // Fixes corner case where new view controller is pushed before another's dismissal has completed
+            if (![possibleViewController.view.layer pop_animationForKey:@"stackNav.dismiss"]) {
+                viewController = possibleViewController;
+                break;
+            }
+        }
     }
-}
 
-
-- (void)enableScrollView:(UIView *)view {
-
-    // First ensure view is scroll view
-    if ([self viewIsScrollView:view]) {
-
-        // View is scroll view, cast as such
-        UIScrollView *scrollView = (UIScrollView *)view;
-
-        // Enable scroll view
-        scrollView.scrollEnabled = true;
-
-    }
-}
-
-
-- (BOOL)scrollViewIsScrolledToTop:(UIView *)view {
-
-    // First ensure view is scroll view
-    if ([self viewIsScrollView:view]) {
-
-        // View is scroll view, cast as such
-        UIScrollView *scrollView = (UIScrollView *)view;
-
-        // Returns true if scroll view is scrolled to top
-        return scrollView.contentOffset.y <= 0;
-
-    } else {
-
-        // Not a scroll view
-        return false;
-
-    }
+    return viewController;
 }
 
 
