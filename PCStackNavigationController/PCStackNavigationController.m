@@ -307,6 +307,18 @@
         // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
         springEnterAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
             self.view.userInteractionEnabled = true;
+
+            // Grab previous view controller
+            UIViewController<PCStackViewController> *previousViewController = self.previousViewController;
+
+            // Check a previous view controller exists
+            if (previousViewController) {
+
+                // Previous view controller exists, hide it!
+                [previousViewController.view.layer pop_removeAllAnimations];
+                previousViewController.view.layer.opacity = 0;
+
+            }
         };
 
         // To value is resting center view incoming view controller
@@ -331,7 +343,7 @@
 
         [incomingViewController didMoveToParentViewController:self];
 
-        [self updatePreviousViewWithOpacity:DOWN_OPACITY scale:DOWN_SCALE animated:NO];
+        [self updatePreviousViewWithOpacity:0 scale:DOWN_SCALE animated:NO];
 
     }
 
@@ -479,30 +491,7 @@
 
     if (self.childViewControllers.count > 1 && ![self.topViewController.view.layer pop_animationForKey:@"stackNav.navigate"]) {
 
-        // The view controller to be updated
-        UIViewController<PCStackViewController> *viewController;
-
-        // Potential to use in nsenum
-        @autoreleasepool {
-
-            // Copy childViewControlelrs mutably so we can pop off the last one
-            NSMutableArray *possibleViewControllers = [self.childViewControllers mutableCopy];
-
-            // Top vc def can't be "previous"
-            [possibleViewControllers removeLastObject];
-
-            // Enumerate view controllers in reverse order (top to bottom)
-            NSEnumerator *reverseControllerEnumerator = [possibleViewControllers reverseObjectEnumerator];
-            UIViewController<PCStackViewController> *possibleViewController;
-            while (possibleViewController = [reverseControllerEnumerator nextObject]) {
-
-                // Fixes corner case where new view controller is pushed before another's dismissal has completed
-                if (![possibleViewController.view.layer pop_animationForKey:@"stackNav.dismiss"]) {
-                    viewController = possibleViewController;
-                    break;
-                }
-            }
-        }
+        UIViewController<PCStackViewController> *viewController = self.previousViewController;
 
         if (viewController) {
 
@@ -521,6 +510,7 @@
                 scaleAnimation.springBounciness = SPRING_BOUNCINESS;
                 scaleAnimation.springSpeed = SPRING_SPEED;
                 scaleAnimation.toValue = [NSValue valueWithCGPoint:CGPointMake(scale, scale)];
+
                 [viewController.view.layer pop_addAnimation:scaleAnimation forKey:@"previousVC.scale"];
 
             } else {
@@ -535,6 +525,36 @@
             }
         }
     }
+}
+
+
+- (UIViewController<PCStackViewController> *)previousViewController {
+    // The view controller to be updated
+    UIViewController<PCStackViewController> *viewController;
+
+    // Potential to use in nsenum
+    @autoreleasepool {
+
+        // Copy childViewControlelrs mutably so we can pop off the last one
+        NSMutableArray *possibleViewControllers = [self.childViewControllers mutableCopy];
+
+        // Top vc def can't be "previous"
+        [possibleViewControllers removeLastObject];
+
+        // Enumerate view controllers in reverse order (top to bottom)
+        NSEnumerator *reverseControllerEnumerator = [possibleViewControllers reverseObjectEnumerator];
+        UIViewController<PCStackViewController> *possibleViewController;
+        while (possibleViewController = [reverseControllerEnumerator nextObject]) {
+
+            // Fixes corner case where new view controller is pushed before another's dismissal has completed
+            if (![possibleViewController.view.layer pop_animationForKey:@"stackNav.dismiss"]) {
+                viewController = possibleViewController;
+                break;
+            }
+        }
+    }
+
+    return viewController;
 }
 
 
