@@ -221,27 +221,41 @@
 
     if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
 
-        // Dismiss view gesture, send it off screen
-        springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+        // Dismiss view gesture, check popability
+        BOOL shouldPop = [self shouldPopViewController:viewController animated:YES];
+
+        if (shouldPop) {
+            // Should pop, animation should go off screen
+            springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+
+            newPrevOpacity = 1;
+            newPrevScale = 1;
+        } else {
+            // Shouldn't pop, animation should return to resting center
+            CGPoint restingCenter = [self restingCenterForViewController:self.topViewController];
+            springAnimation.toValue = @(restingCenter.y);
+
+            newPrevOpacity = DOWN_OPACITY;
+            newPrevScale = DOWN_SCALE;
+        }
+
         springAnimation.springBounciness = 0;
 
-        newPrevOpacity = 1;
-        newPrevScale = 1;
+        if (shouldPop) {
+            // On completion, remove from superview and self
+            springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
 
-        // On completion, remove from superview and self
-        springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+                // Check that animation successfully completed (wasn't interrupted by another gesture)
+                if (completed) {
 
-            // Check that animation successfully completed (wasn't interrupted by another gesture)
-            if (completed) {
+                    // Not interrupted, remove from super view and self
+                    [viewController.view removeFromSuperview];
+                    [viewController removeFromParentViewController];
+                    [self.topViewController viewDidAppear:YES];
 
-                // Not interrupted, remove from super view and self
-                [viewController.view removeFromSuperview];
-                [viewController removeFromParentViewController];
-                [self.topViewController viewDidAppear:YES];
-
-            }
-
-        };
+                }
+            };
+        }
 
         // Add the animation
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
@@ -379,20 +393,21 @@
         // Dismiss view gesture, send it off screen
         springAnimation.toValue = @(self.view.frame.size.height * 1.5);
 
-        // On completion, remove from superview and self
-        springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+        if ([self shouldPopViewController:viewController animated:animated]) {
+            // On completion, remove from superview and self
+            springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
 
-            // Check that animation successfully completed (wasn't interrupted by another gesture)
-            if (completed) {
+                // Check that animation successfully completed (wasn't interrupted by another gesture)
+                if (completed) {
 
-                // Not interrupted, remove from super view and self
-                [viewController.view removeFromSuperview];
-                [viewController removeFromParentViewController];
-                [self.topViewController viewDidAppear:YES];
+                    // Not interrupted, remove from super view and self
+                    [viewController.view removeFromSuperview];
+                    [viewController removeFromParentViewController];
+                    [self.topViewController viewDidAppear:YES];
 
-            }
-
-        };
+                }
+            };
+        }
 
         // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
@@ -402,14 +417,17 @@
 
     } else {
 
-        // Don't animate but go immediately
-        [self updatePreviousViewWithOpacity:1 scale:1 animated:NO];
+        if ([self shouldPopViewController:viewController animated:animated]) {
 
-        // Remove from superview
-        [viewController.view removeFromSuperview];
+            // Don't animate but go immediately
+            [self updatePreviousViewWithOpacity:1 scale:1 animated:NO];
 
-        // Remove from parent
-        [viewController removeFromParentViewController];
+            // Remove from superview
+            [viewController.view removeFromSuperview];
+
+            // Remove from parent
+            [viewController removeFromParentViewController];
+        }
 
     }
 }
@@ -576,6 +594,28 @@
 }
 
 
+- (void)returnViewControllerToRestingCenter:(UIViewController <PCStackViewController> *)viewController completion:(void(^)())completion {
+
+    // Find proper resting center
+    CGPoint restingCenter = [self restingCenterForViewController:viewController];
+
+    // Build animation
+    POPSpringAnimation *springReturnAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPosition];
+    springReturnAnimation.toValue = [NSValue valueWithCGPoint:restingCenter];
+    springReturnAnimation.springBounciness = SPRING_BOUNCINESS;
+    springReturnAnimation.springSpeed = SPRING_SPEED;
+
+    if (completion) {
+        springReturnAnimation.completionBlock = ^ (POPAnimation *animation, BOOL completed) {
+            completion();
+        };
+    }
+
+    // Add animation
+    [viewController.view.layer pop_addAnimation:springReturnAnimation forKey:@"stackNav.return"];
+}
+
+
 - (void)updateStatusBarWithViewController:(UIViewController <PCStackViewController> *)viewController {
 
     // Ignore undeclared selector (only in this method) because we're checking for it before any call is made
@@ -675,6 +715,14 @@
 
 
 #pragma mark etc.
+
+- (BOOL)shouldPopViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated {
+    if ([viewController respondsToSelector:@selector(shouldPopAnimated:)]) {
+        return [viewController shouldPopAnimated:animated];
+    } else {
+        return true;
+    }
+}
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return YES;

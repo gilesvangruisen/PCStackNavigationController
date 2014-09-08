@@ -48,6 +48,9 @@
 // Pop to a specific view controller on the stack
 - (void)popToViewController:(UIViewController<PCStackViewController> *)viewController animated:(BOOL)animated;
 
+// Call and pass a view controller and optional completion block to return that view controller to its resting position
+- (void)returnViewControllerToRestingCenter:(UIViewController <PCStackViewController> *)viewController completion:(void(^)())completion;
+
 @end
 
 
@@ -85,9 +88,14 @@
 // If implemented, the view controller will only be navigable w/ a gesture on this view
 @property (nonatomic, strong) UIView *navigationHandle;
 
-// If present this will be called when the view controller is about to reappear
+// If implemented, this will be called when the view controller is about to reappear
 // on the stack after the view controller above it was popped
 - (void)viewWillReappear:(BOOL)animated;
+
+// If implemented, this will be called immediately before the view controller
+// begins animating downward and if false spring stops around halfway.
+// Note that returning false does NOT return the view controller to visibility. (see returnViewControllerToRestingCenter:completion:)
+- (BOOL)shouldPopAnimated:(BOOL)animated;
 
 // If implemented, this method will be called on a view controller being pushed
 // or the new top view controller after another has been popped
