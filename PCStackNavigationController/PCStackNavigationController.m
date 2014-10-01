@@ -255,6 +255,9 @@
             // On completion, remove from superview and self
             springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
 
+                // Re-enable UI after animation
+                self.view.userInteractionEnabled = true;
+
                 // Check that animation successfully completed (wasn't interrupted by another gesture)
                 if (completed) {
 
@@ -266,6 +269,9 @@
                 }
             };
         }
+
+        // Disable while animating
+        self.view.userInteractionEnabled = false;
 
         // Add the animation
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
@@ -330,6 +336,7 @@
         // Re-enabled previous upon completion
         // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
         springEnterAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+
             self.view.userInteractionEnabled = true;
 
             // Grab previous view controller
@@ -395,6 +402,9 @@
 
     if (animated) {
 
+        // Disable while animating
+        self.view.userInteractionEnabled = false;
+
         // Spring animation
         POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
         springAnimation.springBounciness = 0;
@@ -406,6 +416,9 @@
         if ([self shouldPopViewController:viewController animated:animated]) {
             // On completion, remove from superview and self
             springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+
+                // Re-enable UI after animation
+                self.view.userInteractionEnabled = true;
 
                 // Check that animation successfully completed (wasn't interrupted by another gesture)
                 if (completed) {
