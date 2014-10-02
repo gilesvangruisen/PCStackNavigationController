@@ -451,7 +451,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         CGPoint gestureLocationInViewController = [gesture locationInView:viewController.view];
 
         // <PCStackViewController> has navigationHandle, ensure gesture is within its bounds. If not, gestureIsNavigation = false
-        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle.frame]) {
+        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle]) {
             gestureIsNavigational = false;
         }
 

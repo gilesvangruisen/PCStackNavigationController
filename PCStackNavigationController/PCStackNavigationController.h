@@ -86,7 +86,7 @@
 @optional
 
 // If implemented, the view controller will only be navigable w/ a gesture on this view
-@property (nonatomic, strong) UIView *navigationHandle;
+@property (nonatomic) CGRect navigationHandle;
 
 // If implemented, this will be called when the view controller is about to reappear
 // on the stack after the view controller above it was popped
