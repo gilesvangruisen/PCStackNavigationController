@@ -28,9 +28,9 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         // Set stack nav background to transparent
         self.view.backgroundColor = [UIColor clearColor];
         // Init gesture recognizer, add it to view, set gesture delegate to self
-        UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
-        [self.view addGestureRecognizer:panGestureRecognizer];
-        panGestureRecognizer.delegate = self;
+        self.panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
+        [self.view addGestureRecognizer:self.panGestureRecognizer];
+        self.panGestureRecognizer.delegate = self;
 
     }
 
@@ -140,6 +140,8 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                     viewController = childViewController;
                     gestureIsNavigational = true;
                     break;
+                } else {
+                    gestureIsNavigational = false;
                 }
             }
 
@@ -221,12 +223,22 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     // Popability check
     BOOL shouldPop = [self shouldPopViewController:viewController animated:YES];
 
+    UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:viewController];
+
     if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0 && shouldPop == true) {
+
+        if (previousViewController) {
+
+            // See if we can send it a viewWillAppear so it knows it's about to appear again
+            if ([previousViewController respondsToSelector:@selector(viewWillReappear:)]) {
+                [previousViewController viewWillReappear:YES];
+            }
+        }
 
         // Should pop, animation should go off screen
         springAnimation = [self springDismissAnimationWithVelocity:velocity.y completion:^(POPAnimation *animation, BOOL completed) {
             // Re-enable UI after animation
-            self.view.userInteractionEnabled = true;
+            [self enableGesture];
 
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
@@ -237,21 +249,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
             }
         }];
 
-        UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:viewController];
-
-        if (previousViewController) {
-
-            // See if we can send it a viewWillAppear so it knows it's about to appear again
-            if ([previousViewController respondsToSelector:@selector(viewWillReappear:)]) {
-                [previousViewController viewWillReappear:YES];
-            }
-        }
-
         newPrevOpacity = 1;
         newPrevScale = 1;
 
-        // Disable while animating
-        self.view.userInteractionEnabled = false;
+        [self disableGesture];
 
         // Add the animation
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
@@ -261,7 +262,19 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         newPrevOpacity = DOWN_OPACITY;
         newPrevScale = DOWN_SCALE;
 
-        springAnimation = [self springEnterAnimationWithVelocity:velocity.y viewController:viewController completion:nil];
+        springAnimation = [self springEnterAnimationWithVelocity:velocity.y viewController:viewController completion:^(POPAnimation *animation, BOOL completed) {
+
+            // Check a previous view controller exists
+            if (previousViewController) {
+                // Previous view controller exists, hide it!
+                [previousViewController.view.layer pop_removeAllAnimations];
+                previousViewController.view.layer.opacity = 0;
+            }
+
+            [self enableGesture];
+        }];
+
+        [self disableGesture];
 
         // Add the animation
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.flick"];
@@ -295,7 +308,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         // Disable UI during transition
         // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
-        self.view.userInteractionEnabled = false;
+        [self disableGesture];
 
         // Animated, ensure initial frame is offscreen
         CGRect offScreenFrame = incomingViewController.view.frame;
@@ -307,12 +320,12 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         // Build spring animation to animate incoming into view
         // Re-enable previous upon completion
-        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
+
         POPSpringAnimation *springEnterAnimation = [self springEnterAnimationWithVelocity:0 viewController:incomingViewController completion:^(POPAnimation *animation, BOOL completed) {
-            self.view.userInteractionEnabled = true;
+            [self enableGesture];
 
             // Grab previous view controller
-            UIViewController<PCStackViewController> *previousViewController = self.previousViewController;
+            UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:incomingViewController];
 
             // Check a previous view controller exists
             if (previousViewController) {
@@ -374,13 +387,13 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     if (animated && shouldPop) {
 
         // Disable while animating
-        self.view.userInteractionEnabled = false;
+        [self disableGesture];
 
         // Spring animation
         POPSpringAnimation *springAnimation = [self springDismissAnimationWithVelocity:0 completion:^(POPAnimation *animation, BOOL completed) {
             // On completion, remove from superview and self
             // Re-enable UI after animation
-            self.view.userInteractionEnabled = true;
+            [self enableGesture];
 
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
@@ -492,7 +505,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     if (self.childViewControllers.count > 1 && ![self.topViewController.view.layer pop_animationForKey:@"stackNav.navigate"]) {
 
-        UIViewController<PCStackViewController> *viewController = self.previousViewController;
+        UIViewController<PCStackViewController> *viewController = [self previousViewController];
 
         if (viewController) {
 
@@ -576,6 +589,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     }
 }
 
+
+- (void)disableGesture {
+    self.panGestureRecognizer.enabled = false;
+}
+
+- (void)enableGesture {
+    self.panGestureRecognizer.enabled = true;
+}
 
 - (void)returnViewControllerToRestingCenter:(UIViewController <PCStackViewController> *)viewController completion:(void(^)())completion {
 

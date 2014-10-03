@@ -31,6 +31,9 @@
 // View controller at the bottom of the stack
 @property (nonatomic, weak) UIViewController<PCStackViewController> *bottomViewController;
 
+// Gesture recognizer that does a lot of hard work thank you, gesture recognizer, for all your dedication
+@property (nonatomic, strong) UIPanGestureRecognizer *panGestureRecognizer;
+
 // Returns the top (i.e. last) view controller in viewControllers
 - (UIViewController<PCStackViewController> *)topViewController;
 
