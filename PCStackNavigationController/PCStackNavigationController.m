@@ -21,7 +21,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 #define SPRING_BOUNCINESS 1
 #define SPRING_SPEED 3
-#define DISMISS_VELOCITY_THRESHOLD 250
+#define DISMISS_VELOCITY_THRESHOLD 200
 #define DOWN_SCALE 0.95
 #define DOWN_OPACITY 0.5
 
