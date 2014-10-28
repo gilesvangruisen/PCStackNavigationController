@@ -9,6 +9,12 @@
 #import "PCStackNavigationController.h"
 #import <pop/POP.h>
 
+@interface PCStackNavigationController ()
+
+@property (nonatomic, strong) UIView *snapshotView;
+
+@end
+
 @implementation PCStackNavigationController
 
 typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
@@ -24,15 +30,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 - (id)init {
     self = [super init];
     if (self) {
-
         // Set stack nav background to transparent
         self.view.backgroundColor = [UIColor clearColor];
+
         // Init gesture recognizer, add it to view, set gesture delegate to self
         self.screenEdgePanGestureRecognizer = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(screenEdgePanGestureRecognizer:)];
         self.screenEdgePanGestureRecognizer.edges = UIRectEdgeLeft;
         [self.view addGestureRecognizer:self.screenEdgePanGestureRecognizer];
         self.screenEdgePanGestureRecognizer.delegate = self;
-
     }
 
     return self;
@@ -108,8 +113,16 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 // Set static originalCenter
                 originalCenter = viewController.view.center;
 
+                // Set up snapshot view to be animated
+                self.snapshotView = [viewController.view resizableSnapshotViewFromRect:viewController.view.bounds afterScreenUpdates:true withCapInsets:UIEdgeInsetsZero];
+                self.snapshotView.frame = viewController.view.frame;
+                [self.view addSubview:self.snapshotView];
+
+                // Hide view controller's real view so as not to interfere with snapshot animation
+                viewController.view.layer.opacity = 0;
+
                 // Reposition controller's view.frame.origin.y according to gesture
-                [self centerView:viewController.view onGesture:gesture];
+                [self centerView:self.snapshotView onGesture:gesture];
             }  else {
                 gestureIsNavigational = false;
             }
@@ -120,9 +133,9 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         case UIGestureRecognizerStateChanged: {
             if (gestureIsNavigational) {
                 // Gesture is indeed navigational, handle gesture
-                [self centerView:viewController.view onGesture:gesture];
+                [self centerView:self.snapshotView onGesture:gesture];
 
-                CGFloat progress = [self trackingProgressWithPosition:viewController.view.center.x start:self.view.frame.size.width / 2 end:self.view.frame.size.width * 1.5];
+                CGFloat progress = [self trackingProgressWithPosition:self.snapshotView.center.x start:self.view.frame.size.width / 2 end:self.view.frame.size.width * 1.5];
 
                 CGFloat newPrevOpacity = [self positionWithProgress:progress start:DOWN_OPACITY end:1];
                 CGFloat newPrevScale = [self positionWithProgress:progress start:DOWN_SCALE end:1];
@@ -200,6 +213,11 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
             // Check that animation successfully completed (wasn't interrupted by another gesture)
             if (completed) {
+
+                // Kill the snapshot view
+                [self.snapshotView removeFromSuperview];
+                self.snapshotView = nil;
+
                 // Not interrupted, remove from super view and self
                 [viewController.view removeFromSuperview];
                 [viewController removeFromParentViewController];
@@ -213,7 +231,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         [self disableGesture];
 
         // Add the animation
-        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
+        [self.snapshotView.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
 
     } else {
 
@@ -222,11 +240,17 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         springAnimation = [self springEnterAnimationWithVelocity:velocity.x viewController:viewController completion:^(POPAnimation *animation, BOOL completed) {
 
+            // Kill the snapshot view
+            [self.snapshotView removeFromSuperview];
+            self.snapshotView = nil;
+
             // Check a previous view controller exists
             if (previousViewController) {
                 // Previous view controller exists, hide it!
                 [previousViewController.view.layer pop_removeAllAnimations];
                 previousViewController.view.layer.opacity = 0;
+
+                viewController.view.layer.opacity = 1;
             }
 
             [self enableGesture];
@@ -235,7 +259,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         [self disableGesture];
 
         // Add the animation
-        [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.flick"];
+        [self.snapshotView.layer pop_addAnimation:springAnimation forKey:@"stackNav.flick"];
 
     }
 
@@ -688,11 +712,11 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     // Set initial start center only on began
     if (gesture.state == UIGestureRecognizerStateBegan) {
         originalCenter = view.center;
-    } else {
-        // Calculate new center based on original + translation
-        CGPoint newCenter = [self newCenterWithOriginalCenter:originalCenter translation:[gesture translationInView:self.view]];
-        view.center = newCenter;
     }
+
+    // Calculate new center based on original + translation
+    CGPoint newCenter = [self newCenterWithOriginalCenter:originalCenter translation:[gesture translationInView:self.view]];
+    view.center = newCenter;
 }
 
 
