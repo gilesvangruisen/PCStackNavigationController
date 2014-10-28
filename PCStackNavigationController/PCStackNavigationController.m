@@ -20,10 +20,10 @@
 typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 #define SPRING_BOUNCINESS 1
-#define SPRING_SPEED 3
+#define SPRING_SPEED 4
 #define DISMISS_VELOCITY_THRESHOLD 200
 #define DOWN_SCALE 0.95
-#define DOWN_OPACITY 0.5
+#define DOWN_OPACITY 0
 
 #pragma mark initialization
 
@@ -135,8 +135,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 // Gesture is indeed navigational, handle gesture
                 [self centerView:self.snapshotView onGesture:gesture];
 
-                CGFloat progress = [self trackingProgressWithPosition:self.snapshotView.center.x start:self.view.frame.size.width / 2 end:self.view.frame.size.width * 1.5];
-
+                CGFloat progress = [self trackingProgressWithPosition:self.snapshotView.center.x start:self.view.center.x end:self.view.center.x * 3];
                 CGFloat newPrevOpacity = [self positionWithProgress:progress start:DOWN_OPACITY end:1];
                 CGFloat newPrevScale = [self positionWithProgress:progress start:DOWN_SCALE end:1];
 
@@ -169,6 +168,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 // Gesture is indeed navigational, handle gesture ended
                 [self handleNavigationGestureEnded:gesture withOriginalCenter:originalCenter viewController:viewController];
                 viewController = nil;
+                self.view.userInteractionEnabled = true;
 
             }
 
@@ -276,6 +276,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 - (void)pushViewController:(UIViewController<PCStackViewController> *)incomingViewController animated:(BOOL)animated {
 
+    // Grab previous view controller
+    UIViewController<PCStackViewController> *previousViewController = self.topViewController;
+    previousViewController.view.userInteractionEnabled = false;
+
     // Incoming needs to know its index and stack controller
     incomingViewController.stackIndex = self.childViewControllers.count;
     incomingViewController.stackController = self;
@@ -289,7 +293,6 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     if (animated) {
 
         // Disable UI during transition
-        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
         [self disableGesture];
 
         // Animated, ensure initial frame is offscreen
@@ -306,15 +309,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         POPSpringAnimation *springEnterAnimation = [self springEnterAnimationWithVelocity:0 viewController:incomingViewController completion:^(POPAnimation *animation, BOOL completed) {
             [self enableGesture];
 
-            // Grab previous view controller
-            UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:incomingViewController];
-
             // Check a previous view controller exists
             if (previousViewController) {
 
                 // Previous view controller exists, hide it!
                 [previousViewController.view.layer pop_removeAllAnimations];
                 previousViewController.view.layer.opacity = 0;
+
+                previousViewController.view.userInteractionEnabled = true;
 
             }
         }];
@@ -757,10 +759,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 }
 
 - (CGFloat)trackingProgressWithPosition:(CGFloat)position start:(CGFloat)start end:(CGFloat)end {
-    // Get offset starting at zero
+    // Get corrected position from zero
     CGFloat offset = position - start;
     // Max offset from zero
-    CGFloat maxOffset = end / 2;
+    CGFloat maxOffset = end - start;
     // Progress of offset between zero and max offset, capped at one
     CGFloat progress = fmaxf(fminf(offset / maxOffset, 1), 0);
 
