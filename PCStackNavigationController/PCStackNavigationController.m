@@ -353,6 +353,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     // Grab top view controller to be dismissed
     UIViewController<PCStackViewController> *viewController = self.topViewController;
+    NSLog(@"pop %@", viewController);
 
     // Get the view controller below it too
     NSInteger belowIndex = self.topViewController.stackIndex - 1;
