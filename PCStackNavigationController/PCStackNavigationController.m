@@ -14,10 +14,10 @@
 typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 #define SPRING_BOUNCINESS 1
-#define SPRING_SPEED 4
+#define SPRING_SPEED 3
 #define DISMISS_VELOCITY_THRESHOLD 250
 #define DOWN_SCALE 0.95
-#define DOWN_OPACITY 0.8
+#define DOWN_OPACITY 0.5
 
 #pragma mark initialization
 
@@ -28,9 +28,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         // Set stack nav background to transparent
         self.view.backgroundColor = [UIColor clearColor];
         // Init gesture recognizer, add it to view, set gesture delegate to self
-        self.panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
-        [self.view addGestureRecognizer:self.panGestureRecognizer];
-        self.panGestureRecognizer.delegate = self;
+        self.screenEdgePanGestureRecognizer = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(screenEdgePanGestureRecognizer:)];
+        self.screenEdgePanGestureRecognizer.edges = UIRectEdgeLeft;
+        [self.view addGestureRecognizer:self.screenEdgePanGestureRecognizer];
+        self.screenEdgePanGestureRecognizer.delegate = self;
 
     }
 
@@ -72,51 +73,9 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 }
 
 
-- (void)centerView:(UIView *)view onGesture:(UIPanGestureRecognizer *)gesture {
-    // Static variable originalCenter
-    static CGPoint originalCenter;
-
-    // Remove any animations
-    [view.layer pop_removeAllAnimations];
-
-    // Set initial start center only on began
-    if (gesture.state == UIGestureRecognizerStateBegan) {
-        originalCenter = view.center;
-    }
-
-    // Calculate new center based on original + translation
-    CGPoint newCenter = [self newCenterWithOriginalCenter:originalCenter translation:[gesture translationInView:self.view]];
-    view.center = newCenter;
-}
-
-
-- (CGPoint)newCenterWithOriginalCenter:(CGPoint)original translation:(CGPoint)translation {
-
-    CGPoint newCenter = original;
-
-    // Add translation y to original y
-    newCenter.y += translation.y;
-
-    return newCenter;
-}
-
-
-- (void)centerView:(UIView *)view onPoint:(CGPoint)point withDuration:(CGFloat)duration easing:(UIViewAnimationOptions)viewAnimationOptions {
-    [UIView animateWithDuration:duration
-                          delay:0.0f
-                        options:UIViewAnimationOptionBeginFromCurrentState|
-     UIViewAnimationOptionAllowUserInteraction|
-     viewAnimationOptions
-                     animations:^{
-                         view.center = point;
-                     } completion:NULL];
-}
-
-
-
 #pragma mark Pan Gesture
 
-- (void)panGestureRecognizer:(UIPanGestureRecognizer *)gesture {
+- (void)screenEdgePanGestureRecognizer:(UIScreenEdgePanGestureRecognizer *)gesture {
     // Static variables set only on UIGestureRecognizerStateBegan
     static UIViewController<PCStackViewController> *viewController;
     static CGPoint originalCenter;
@@ -132,20 +91,18 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         case UIGestureRecognizerStateBegan: {
             originalCenter = [gesture locationInView:self.view];
 
-            // Find the right view controller
-            NSEnumerator *childViewControllerEnumerator = [self.childViewControllers reverseObjectEnumerator];
             UIViewController<PCStackViewController> *childViewController;
-            while(childViewController = [childViewControllerEnumerator nextObject]) {
-                if ([self gesture:gesture canNavigateViewController:childViewController]) {
-                    viewController = childViewController;
-                    gestureIsNavigational = true;
-                    break;
-                } else {
-                    gestureIsNavigational = false;
-                }
-            }
+            childViewController = self.topViewController;
 
-            if (gestureIsNavigational) {
+            if ([self gesture:gesture canNavigateViewController:childViewController]) {
+                // View controller is navigable
+                viewController = childViewController;
+
+                // Gesture is navigational
+                gestureIsNavigational = true;
+
+                // Disable interaction for now
+                self.view.userInteractionEnabled = false;
 
                 // Gesture is indeed navigational
                 // Set static originalCenter
@@ -153,7 +110,8 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
                 // Reposition controller's view.frame.origin.y according to gesture
                 [self centerView:viewController.view onGesture:gesture];
-
+            }  else {
+                gestureIsNavigational = false;
             }
 
             break;
@@ -161,11 +119,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         case UIGestureRecognizerStateChanged: {
             if (gestureIsNavigational) {
-
                 // Gesture is indeed navigational, handle gesture
                 [self centerView:viewController.view onGesture:gesture];
 
-                CGFloat progress = [self trackingProgressWithPosition:viewController.view.center.y start:self.view.frame.size.height / 2 end:self.view.frame.size.height * 1.5];
+                CGFloat progress = [self trackingProgressWithPosition:viewController.view.center.x start:self.view.frame.size.width / 2 end:self.view.frame.size.width * 1.5];
 
                 CGFloat newPrevOpacity = [self positionWithProgress:progress start:DOWN_OPACITY end:1];
                 CGFloat newPrevScale = [self positionWithProgress:progress start:DOWN_SCALE end:1];
@@ -185,6 +142,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 // Gesture is indeed navigational, handle gesture ended
                 [self handleNavigationGestureEnded:gesture withOriginalCenter:originalCenter viewController:viewController];
                 viewController = nil;
+                self.view.userInteractionEnabled = true;
 
             }
 
@@ -209,7 +167,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 }
 
 
-- (void)handleNavigationGestureEnded:(UIPanGestureRecognizer *)gesture withOriginalCenter:(CGPoint)originalCenter viewController:(UIViewController <PCStackViewController> *)viewController {
+- (void)handleNavigationGestureEnded:(UIScreenEdgePanGestureRecognizer *)gesture withOriginalCenter:(CGPoint)originalCenter viewController:(UIViewController <PCStackViewController> *)viewController {
     // Grab velocity and location from gesture
     CGPoint velocity = [gesture velocityInView:self.view];
 
@@ -225,7 +183,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:viewController];
 
-    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0 && shouldPop == true) {
+    if (velocity.x > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0 && shouldPop == true) {
 
         if (previousViewController) {
 
@@ -236,7 +194,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         }
 
         // Should pop, animation should go off screen
-        springAnimation = [self springDismissAnimationWithVelocity:velocity.y completion:^(POPAnimation *animation, BOOL completed) {
+        springAnimation = [self springDismissAnimationWithVelocity:velocity.x completion:^(POPAnimation *animation, BOOL completed) {
             // Re-enable UI after animation
             [self enableGesture];
 
@@ -262,7 +220,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
         newPrevOpacity = DOWN_OPACITY;
         newPrevScale = DOWN_SCALE;
 
-        springAnimation = [self springEnterAnimationWithVelocity:velocity.y viewController:viewController completion:^(POPAnimation *animation, BOOL completed) {
+        springAnimation = [self springEnterAnimationWithVelocity:velocity.x viewController:viewController completion:^(POPAnimation *animation, BOOL completed) {
 
             // Check a previous view controller exists
             if (previousViewController) {
@@ -440,7 +398,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 
 // Returns true if gesture passed is intended to be navigational (combination of axis, state of view controller, gesture being within bounds)
-- (BOOL)gesture:(UIPanGestureRecognizer *)gesture canNavigateViewController:(UIViewController<PCStackViewController> *)viewController {
+- (BOOL)gesture:(UIScreenEdgePanGestureRecognizer *)gesture canNavigateViewController:(UIViewController<PCStackViewController> *)viewController {
     /*
 
      DETERMINING PRIMARY AXIS OF GESTURE (VERTICAL VS HORIZONTAL)
@@ -453,36 +411,15 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     // Grab velocity and location in view from gesture
     CGPoint gestureVelocity = [gesture velocityInView:self.view];
-    CGPoint gestureLocation = [gesture locationInView:self.view];
 
     // will set to true if gesture is primarily vertical as noted above
-    BOOL gestureIsNavigational = fabsf(gestureVelocity.y) > fabsf(gestureVelocity.x);
-
-    // Check for navigationHandle
-    if ([viewController respondsToSelector:@selector(navigationHandle)]) {
-
-        CGPoint gestureLocationInViewController = [gesture locationInView:viewController.view];
-
-        // <PCStackViewController> has navigationHandle, ensure gesture is within its bounds. If not, gestureIsNavigation = false
-        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle]) {
-            gestureIsNavigational = false;
-        }
-
-    }
-
-    // Check if viewController implements allowsNavigation and include
-    if ([viewController respondsToSelector:@selector(allowsNavigation)]) {
-        gestureIsNavigational = gestureIsNavigational && [viewController allowsNavigation];
-    }
+    BOOL gestureIsNavigational = fabsf(gestureVelocity.x) > fabsf(gestureVelocity.y);
 
     // Check if view controller view has pop_animation of key stackNav.dismiss and if so, don't allow nav
-    gestureIsNavigational = gestureIsNavigational && ![[viewController.view pop_animationKeys] containsObject:@"stackNav.dismiss"];
+    gestureIsNavigational = gestureIsNavigational && !viewController.view.pop_animationKeys.count > 0;
 
     // Check that we're not trying to navigate the root view controller
     gestureIsNavigational = gestureIsNavigational && viewController.stackIndex > 0;
-
-    // Check if original gesture position is inside visibleViewController's view frame and let hat help determine if gesture is navigational
-    gestureIsNavigational = gestureIsNavigational && [self point:gestureLocation isWithinBounds:viewController.view.frame];
 
     return gestureIsNavigational;
 }
@@ -591,11 +528,11 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 
 - (void)disableGesture {
-    self.panGestureRecognizer.enabled = false;
+    self.screenEdgePanGestureRecognizer.enabled = false;
 }
 
 - (void)enableGesture {
-    self.panGestureRecognizer.enabled = true;
+    self.screenEdgePanGestureRecognizer.enabled = true;
 }
 
 - (void)returnViewControllerToRestingCenter:(UIViewController <PCStackViewController> *)viewController completion:(void(^)())completion {
@@ -739,6 +676,47 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     springAnimation.springBounciness = 0;
     return springAnimation;
 }
+
+
+- (void)centerView:(UIView *)view onGesture:(UIPanGestureRecognizer *)gesture {
+    // Static variable originalCenter
+    static CGPoint originalCenter;
+
+    // Remove any animations
+    [view.layer pop_removeAllAnimations];
+
+    // Set initial start center only on began
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        originalCenter = view.center;
+    } else {
+        // Calculate new center based on original + translation
+        CGPoint newCenter = [self newCenterWithOriginalCenter:originalCenter translation:[gesture translationInView:self.view]];
+        view.center = newCenter;
+    }
+}
+
+
+- (CGPoint)newCenterWithOriginalCenter:(CGPoint)original translation:(CGPoint)translation {
+    CGPoint newCenter = original;
+
+    // Add translation x to original x
+    newCenter.x += translation.x;
+
+    return newCenter;
+}
+
+
+- (void)centerView:(UIView *)view onPoint:(CGPoint)point withDuration:(CGFloat)duration easing:(UIViewAnimationOptions)viewAnimationOptions {
+    [UIView animateWithDuration:duration
+                          delay:0.0f
+                        options:UIViewAnimationOptionBeginFromCurrentState|
+     UIViewAnimationOptionAllowUserInteraction|
+     viewAnimationOptions
+                     animations:^{
+                         view.center = point;
+                     } completion:NULL];
+}
+
 
 #pragma mark etc.
 
