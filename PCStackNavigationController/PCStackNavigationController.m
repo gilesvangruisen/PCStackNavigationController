@@ -312,7 +312,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         // Animated, ensure initial frame is offscreen
         CGRect offScreenFrame = incomingViewController.view.frame;
-        offScreenFrame.origin.y = self.view.frame.size.height;
+        offScreenFrame.origin.x = self.view.frame.size.width;
         incomingViewController.view.frame = offScreenFrame;
 
         // Add incoming as subview
@@ -718,8 +718,8 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 #pragma mark animations
 
-- (POPSpringAnimation *)springCenterYAnimationWithVelocity:(CGFloat)velocity completion:(completion_block)completionBlock {
-    POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+- (POPSpringAnimation *)springCenterXAnimationWithVelocity:(CGFloat)velocity completion:(completion_block)completionBlock {
+    POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionX];
     springAnimation.springBounciness = SPRING_BOUNCINESS;
     springAnimation.springSpeed = SPRING_SPEED;
     springAnimation.velocity = @(velocity);
@@ -728,14 +728,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 }
 
 - (POPSpringAnimation *)springEnterAnimationWithVelocity:(CGFloat)velocity viewController:(UIViewController<PCStackViewController> *)viewController completion:(completion_block)completionBlock {
-    POPSpringAnimation *springAnimation = [self springCenterYAnimationWithVelocity:velocity completion:completionBlock];
-    springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
+    POPSpringAnimation *springAnimation = [self springCenterXAnimationWithVelocity:velocity completion:completionBlock];
+    springAnimation.toValue = @([self restingCenterForViewController:viewController].x);
     return springAnimation;
 }
 
 - (POPSpringAnimation *)springDismissAnimationWithVelocity:(CGFloat)velocity completion:(completion_block)completionBlock {
-    POPSpringAnimation *springAnimation = [self springCenterYAnimationWithVelocity:velocity completion:completionBlock];
-    springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+    POPSpringAnimation *springAnimation = [self springCenterXAnimationWithVelocity:velocity completion:completionBlock];
+    springAnimation.toValue = @(self.view.frame.size.width * 1.5);
     springAnimation.springBounciness = 0;
     return springAnimation;
 }
