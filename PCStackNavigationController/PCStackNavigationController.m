@@ -123,6 +123,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
                 // Reposition controller's view.frame.origin.y according to gesture
                 [self centerView:self.snapshotView onGesture:gesture];
+
+                if ([viewController respondsToSelector:@selector(didNavigateWithGesture:)]) {
+                    [viewController didNavigateWithGesture:gesture];
+                }
             }  else {
                 gestureIsNavigational = false;
             }
@@ -142,6 +146,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:NO];
 
                 [self updateStatusBar];
+
+                if ([viewController respondsToSelector:@selector(didNavigateWithGesture:)]) {
+                    [viewController didNavigateWithGesture:gesture];
+                }
             }
 
             break;
@@ -153,9 +161,13 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
                 // Gesture is indeed navigational, handle gesture ended
                 [self handleNavigationGestureEnded:gesture withOriginalCenter:originalCenter viewController:viewController];
-                viewController = nil;
                 self.view.userInteractionEnabled = true;
 
+                if ([viewController respondsToSelector:@selector(didNavigateWithGesture:)]) {
+                    [viewController didNavigateWithGesture:gesture];
+                }
+
+                viewController = nil;
             }
 
             break;
@@ -167,14 +179,19 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
                 // Gesture is indeed navigational, handle gesture ended
                 [self handleNavigationGestureEnded:gesture withOriginalCenter:originalCenter viewController:viewController];
-                viewController = nil;
                 self.view.userInteractionEnabled = true;
 
+                if ([viewController respondsToSelector:@selector(didNavigateWithGesture:)]) {
+                    [viewController didNavigateWithGesture:gesture];
+                }
+
+                viewController = nil;
             }
 
             break;
         }
     }
+
     #pragma clang diagnostic pop
 
 }
