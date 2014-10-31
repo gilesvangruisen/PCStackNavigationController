@@ -21,7 +21,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
 #define SPRING_BOUNCINESS 1
 #define SPRING_SPEED 4
-#define DISMISS_VELOCITY_THRESHOLD 200
+#define DISMISS_VELOCITY_THRESHOLD 0
 #define DOWN_SCALE 0.95
 #define DOWN_OPACITY 0
 
@@ -215,12 +215,9 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     if (velocity.x > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0 && shouldPop == true) {
 
-        if (previousViewController) {
-
-            // See if we can send it a viewWillAppear so it knows it's about to appear again
-            if ([previousViewController respondsToSelector:@selector(viewWillReappear:)]) {
-                [previousViewController viewWillReappear:YES];
-            }
+        // See if we can send it a viewWillAppear so it knows it's about to appear again
+        if (previousViewController && [previousViewController respondsToSelector:@selector(viewWillReappear:)]) {
+            [previousViewController viewWillReappear:YES];
         }
 
         // Should pop, animation should go off screen
@@ -280,9 +277,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     }
 
-    if (newPrevScale && newPrevOpacity) {
-        [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:YES];
-    }
+    [self updatePreviousViewWithOpacity:newPrevOpacity scale:newPrevScale animated:YES];
 
     [self updateStatusBar];
 }
