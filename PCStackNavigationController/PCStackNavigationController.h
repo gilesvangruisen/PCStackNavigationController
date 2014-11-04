@@ -32,7 +32,7 @@
 @property (nonatomic, weak) UIViewController<PCStackViewController> *bottomViewController;
 
 // Gesture recognizer that does a lot of hard work thank you, gesture recognizer, for all your dedication
-@property (nonatomic, strong) UIPanGestureRecognizer *panGestureRecognizer;
+@property (nonatomic, strong) UIScreenEdgePanGestureRecognizer *screenEdgePanGestureRecognizer;
 
 // Returns the top (i.e. last) view controller in viewControllers
 - (UIViewController<PCStackViewController> *)topViewController;
@@ -88,25 +88,26 @@
 
 @optional
 
-// If implemented, the view controller will only be navigable w/ a gesture on this view
-@property (nonatomic) CGRect navigationHandle;
+/** If implemented, this will be called while the user is panning along
+the view controller in a navigation gesture */
+- (void)didNavigateWithGesture:(UIScreenEdgePanGestureRecognizer *)gesture;
 
-// If implemented, this will be called when the view controller is about to reappear
-// on the stack after the view controller above it was popped
+/** If implemented, this will be called when the view controller is about to reappear
+on the stack after the view controller above it was popped */
 - (void)viewWillReappear:(BOOL)animated;
 
-// If implemented, this will be called immediately before the view controller
-// begins animating downward and if false spring stops around halfway.
-// Note that returning false does NOT return the view controller to visibility. (see returnViewControllerToRestingCenter:completion:)
+/** If implemented, this will be called immediately before the view controller
+begins animating downward and if false spring stops around halfway.
+Note that returning false does NOT return the view controller to visibility. (see returnViewControllerToRestingCenter:completion:) */
 - (BOOL)shouldPopAnimated:(BOOL)animated;
 
-// If implemented, this method will be called on a view controller being pushed
-// or the new top view controller after another has been popped
+/** If implemented, this method will be called on a view controller being pushed
+or the new top view controller after another has been popped */
 - (void)updateStatusBar;
 
-// If implemented, this method will determine whether or not a navigation
-// gesture will have any affect on the implementing view controller, true to
-// allow, false to disable
+/** If implemented, this method will determine whether or not a navigation
+gesture will have any affect on the implementing view controller, true to
+allow, false to disable */
 - (BOOL)allowsNavigation;
 
 @end
