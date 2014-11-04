@@ -92,10 +92,6 @@
 the view controller in a navigation gesture */
 - (void)didNavigateWithGesture:(UIScreenEdgePanGestureRecognizer *)gesture;
 
-/** If implemented, this will be called when the view controller is about to reappear
-on the stack after the view controller above it was popped */
-- (void)viewWillReappear:(BOOL)animated;
-
 /** If implemented, this will be called immediately before the view controller
 begins animating downward and if false spring stops around halfway.
 Note that returning false does NOT return the view controller to visibility. (see returnViewControllerToRestingCenter:completion:) */
