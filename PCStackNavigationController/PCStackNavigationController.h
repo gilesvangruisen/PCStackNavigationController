@@ -91,13 +91,9 @@
 // If implemented, the view controller will only be navigable w/ a gesture on this view
 @property (nonatomic) CGRect navigationHandle;
 
-// If implemented, this will be called when the view controller is about to reappear
-// on the stack after the view controller above it was popped
-- (void)viewWillReappear:(BOOL)animated;
-
-// If implemented, this will be called immediately before the view controller
-// begins animating downward and if false spring stops around halfway.
-// Note that returning false does NOT return the view controller to visibility. (see returnViewControllerToRestingCenter:completion:)
+/** If implemented, this will be called immediately before the view controller
+begins animating downward and if false spring stops around halfway.
+Note that returning false does NOT return the view controller to visibility. (see returnViewControllerToRestingCenter:completion:) */
 - (BOOL)shouldPopAnimated:(BOOL)animated;
 
 // If implemented, this method will be called on a view controller being pushed

@@ -227,12 +227,12 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
     if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0 && shouldPop == true) {
 
-        if (previousViewController) {
+        // Tell child it's disappearing
+        [viewController beginAppearanceTransition:false animated:true];
 
-            // See if we can send it a viewWillAppear so it knows it's about to appear again
-            if ([previousViewController respondsToSelector:@selector(viewWillReappear:)]) {
-                [previousViewController viewWillReappear:YES];
-            }
+        // Check for previous and alert it to appearance begin
+        if (previousViewController) {
+            [previousViewController beginAppearanceTransition:true animated:true];
         }
 
         // Should pop, animation should go off screen
@@ -245,7 +245,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 // Not interrupted, remove from super view and self
                 [viewController.view removeFromSuperview];
                 [viewController removeFromParentViewController];
-                [self.topViewController viewDidAppear:YES];
+
+                // Tell child it's disappeared
+                [viewController endAppearanceTransition];
+
+                // Check for previous and alert it to appearance end
+                if (previousViewController) {
+                    [previousViewController endAppearanceTransition];
+                }
             }
         }];
 
@@ -301,8 +308,8 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     // Add child view controller to self (calls willMoveToParent)
     [self addChildViewController:incomingViewController];
 
-    // Incoming moved to parent
-    [incomingViewController didMoveToParentViewController:self];
+    // Tell child it's about to transition
+    [incomingViewController beginAppearanceTransition:true animated:animated];
 
     if (animated) {
 
@@ -327,13 +334,19 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
             // Grab previous view controller
             UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:incomingViewController];
 
+            // Incoming moved to parent
+            [incomingViewController didMoveToParentViewController:self];
+
+            // Tell child it's ending transition
+            [incomingViewController endAppearanceTransition];
+
             // Check a previous view controller exists
             if (previousViewController) {
 
                 // Previous view controller exists, hide it!
                 [previousViewController.view.layer pop_removeAllAnimations];
                 previousViewController.view.layer.opacity = 0;
-
+                previousViewController.view.userInteractionEnabled = true;
             }
         }];
 
@@ -370,17 +383,7 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     // Grab top view controller to be dismissed
     UIViewController<PCStackViewController> *viewController = self.topViewController;
 
-    // Get the view controller below it too
-    NSInteger belowIndex = self.topViewController.stackIndex - 1;
-
-    if (belowIndex >= 0) {
-        UIViewController<PCStackViewController> *belowViewController = [self.childViewControllers objectAtIndex:belowIndex];
-
-        // See if we can send it a viewWillAppear so it knows it's about to appear again
-        if ([belowViewController respondsToSelector:@selector(viewWillReappear:)]) {
-            [belowViewController viewWillReappear:YES];
-        }
-    }
+    UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:viewController];;
 
     BOOL shouldPop = [self shouldPopViewController:viewController animated:animated];
 
@@ -388,6 +391,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         // Disable while animating
         [self disableGesture];
+
+        // Tell child we're transitioning
+        [viewController beginAppearanceTransition:false animated:true];
+
+        // Check for previous and alert to transition begin
+        if (previousViewController) {
+            [previousViewController beginAppearanceTransition:true animated:true];
+        }
 
         // Spring animation
         POPSpringAnimation *springAnimation = [self springDismissAnimationWithVelocity:0 completion:^(POPAnimation *animation, BOOL completed) {
@@ -401,7 +412,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
                 // Not interrupted, remove from super view and self
                 [viewController.view removeFromSuperview];
                 [viewController removeFromParentViewController];
-                [self.topViewController viewDidAppear:YES];
+
+                // Tell child we're done
+                [viewController endAppearanceTransition];
+
+                // Check for previous and alert to transition end
+                if (previousViewController) {
+                    [previousViewController endAppearanceTransition];
+                }
             }
         }];
 
@@ -415,6 +433,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
         if ([self shouldPopViewController:viewController animated:animated]) {
 
+            // Tell child we're transitioning
+            [viewController beginAppearanceTransition:false animated:false];
+
+            // Check for previous and alert to transition begin
+            if (previousViewController) {
+                [previousViewController beginAppearanceTransition:true animated:true];
+            }
+
             // Don't animate but go immediately
             [self updatePreviousViewWithOpacity:1 scale:1 animated:NO];
 
@@ -423,6 +449,14 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
 
             // Remove from parent
             [viewController removeFromParentViewController];
+
+            // Tell child we're transitioning
+            [viewController endAppearanceTransition];
+
+            // Check for previous and alert to transition end
+            if (previousViewController) {
+                [previousViewController endAppearanceTransition];
+            }
         }
 
     }
@@ -771,6 +805,10 @@ typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
     // Position accounting for offset
     CGFloat position = (progress * distance) + start;
     return position;
+}
+
+- (BOOL)shouldAutomaticallyForwardAppearanceMethods {
+    return false;
 }
 
 #pragma mark Math
