@@ -11,9 +11,11 @@
 
 @implementation PCStackNavigationController
 
+typedef void(^completion_block)(POPAnimation *animation, BOOL completed);
+
 #define SPRING_BOUNCINESS 1
-#define SPRING_SPEED 6
-#define DISMISS_VELOCITY_THRESHOLD 150
+#define SPRING_SPEED 4
+#define DISMISS_VELOCITY_THRESHOLD 250
 #define DOWN_SCALE 0.95
 #define DOWN_OPACITY 0.8
 
@@ -26,9 +28,9 @@
         // Set stack nav background to transparent
         self.view.backgroundColor = [UIColor clearColor];
         // Init gesture recognizer, add it to view, set gesture delegate to self
-        UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
-        [self.view addGestureRecognizer:panGestureRecognizer];
-        panGestureRecognizer.delegate = self;
+        self.panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognizer:)];
+        [self.view addGestureRecognizer:self.panGestureRecognizer];
+        self.panGestureRecognizer.delegate = self;
 
     }
 
@@ -138,6 +140,8 @@
                     viewController = childViewController;
                     gestureIsNavigational = true;
                     break;
+                } else {
+                    gestureIsNavigational = false;
                 }
             }
 
@@ -214,48 +218,41 @@
     CGFloat newPrevScale;
 
     // Spring animation
-    POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
-    springAnimation.springBounciness = SPRING_BOUNCINESS;
-    springAnimation.springSpeed = SPRING_SPEED;
-    springAnimation.velocity = @(velocity.y);
+    POPSpringAnimation *springAnimation;
 
-    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0) {
+    // Popability check
+    BOOL shouldPop = [self shouldPopViewController:viewController animated:YES];
 
-        // Dismiss view gesture, check popability
-        BOOL shouldPop = [self shouldPopViewController:viewController animated:YES];
+    UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:viewController];
 
-        if (shouldPop) {
-            // Should pop, animation should go off screen
-            springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+    if (velocity.y > DISMISS_VELOCITY_THRESHOLD && viewController.stackIndex > 0 && shouldPop == true) {
 
-            newPrevOpacity = 1;
-            newPrevScale = 1;
-        } else {
-            // Shouldn't pop, animation should return to resting center
-            CGPoint restingCenter = [self restingCenterForViewController:self.topViewController];
-            springAnimation.toValue = @(restingCenter.y);
+        if (previousViewController) {
 
-            newPrevOpacity = DOWN_OPACITY;
-            newPrevScale = DOWN_SCALE;
+            // See if we can send it a viewWillAppear so it knows it's about to appear again
+            if ([previousViewController respondsToSelector:@selector(viewWillReappear:)]) {
+                [previousViewController viewWillReappear:YES];
+            }
         }
 
-        springAnimation.springBounciness = 0;
+        // Should pop, animation should go off screen
+        springAnimation = [self springDismissAnimationWithVelocity:velocity.y completion:^(POPAnimation *animation, BOOL completed) {
+            // Re-enable UI after animation
+            [self enableGesture];
 
-        if (shouldPop) {
-            // On completion, remove from superview and self
-            springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+            // Check that animation successfully completed (wasn't interrupted by another gesture)
+            if (completed) {
+                // Not interrupted, remove from super view and self
+                [viewController.view removeFromSuperview];
+                [viewController removeFromParentViewController];
+                [self.topViewController viewDidAppear:YES];
+            }
+        }];
 
-                // Check that animation successfully completed (wasn't interrupted by another gesture)
-                if (completed) {
+        newPrevOpacity = 1;
+        newPrevScale = 1;
 
-                    // Not interrupted, remove from super view and self
-                    [viewController.view removeFromSuperview];
-                    [viewController removeFromParentViewController];
-                    [self.topViewController viewDidAppear:YES];
-
-                }
-            };
-        }
+        [self disableGesture];
 
         // Add the animation
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
@@ -265,8 +262,19 @@
         newPrevOpacity = DOWN_OPACITY;
         newPrevScale = DOWN_SCALE;
 
-        // Velocity is negative and below threshold (upward "throw" swipe)
-        springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
+        springAnimation = [self springEnterAnimationWithVelocity:velocity.y viewController:viewController completion:^(POPAnimation *animation, BOOL completed) {
+
+            // Check a previous view controller exists
+            if (previousViewController) {
+                // Previous view controller exists, hide it!
+                [previousViewController.view.layer pop_removeAllAnimations];
+                previousViewController.view.layer.opacity = 0;
+            }
+
+            [self enableGesture];
+        }];
+
+        [self disableGesture];
 
         // Add the animation
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.flick"];
@@ -300,7 +308,7 @@
 
         // Disable UI during transition
         // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
-        self.view.userInteractionEnabled = false;
+        [self disableGesture];
 
         // Animated, ensure initial frame is offscreen
         CGRect offScreenFrame = incomingViewController.view.frame;
@@ -311,19 +319,13 @@
         [self.view addSubview:incomingViewController.view];
 
         // Build spring animation to animate incoming into view
-        POPSpringAnimation *springEnterAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+        // Re-enable previous upon completion
 
-        // Set spring animation bounciness and speed to stackNav defaults
-        springEnterAnimation.springBounciness = SPRING_BOUNCINESS;
-        springEnterAnimation.springSpeed = SPRING_SPEED;
-
-        // Re-enabled previous upon completion
-        // TODO: maybe find a better solution that doesn't prevent immediate dismissal unless we want immediate dismissal for accident prevention
-        springEnterAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
-            self.view.userInteractionEnabled = true;
+        POPSpringAnimation *springEnterAnimation = [self springEnterAnimationWithVelocity:0 viewController:incomingViewController completion:^(POPAnimation *animation, BOOL completed) {
+            [self enableGesture];
 
             // Grab previous view controller
-            UIViewController<PCStackViewController> *previousViewController = self.previousViewController;
+            UIViewController<PCStackViewController> *previousViewController = [self viewControllerBeforeViewController:incomingViewController];
 
             // Check a previous view controller exists
             if (previousViewController) {
@@ -333,10 +335,7 @@
                 previousViewController.view.layer.opacity = 0;
 
             }
-        };
-
-        // To value is resting center view incoming view controller
-        springEnterAnimation.toValue = @([self restingCenterForViewController:incomingViewController].y);
+        }];
 
         // Add spring enter animation to incoming view controller
         [incomingViewController.view.layer pop_addAnimation:springEnterAnimation forKey:@"stackNav.enter"];
@@ -345,7 +344,7 @@
 
     } else {
 
-        // Not animated so make sure frame (spec. origin) is correct upon adding as subview
+        // Not animated so make sure frame (spec. origin.y) is correct upon adding as subview
         CGRect viewFrame = incomingViewController.view.frame;
         viewFrame.origin.y = [self restingCenterForViewController:incomingViewController].y - (viewFrame.size.height / 2);
 
@@ -383,31 +382,28 @@
         }
     }
 
-    if (animated) {
+    BOOL shouldPop = [self shouldPopViewController:viewController animated:animated];
+
+    if (animated && shouldPop) {
+
+        // Disable while animating
+        [self disableGesture];
 
         // Spring animation
-        POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
-        springAnimation.springBounciness = 0;
-        springAnimation.springSpeed = SPRING_SPEED;
-
-        // Dismiss view gesture, send it off screen
-        springAnimation.toValue = @(self.view.frame.size.height * 1.5);
-
-        if ([self shouldPopViewController:viewController animated:animated]) {
+        POPSpringAnimation *springAnimation = [self springDismissAnimationWithVelocity:0 completion:^(POPAnimation *animation, BOOL completed) {
             // On completion, remove from superview and self
-            springAnimation.completionBlock = ^(POPAnimation *animation, BOOL completed) {
+            // Re-enable UI after animation
+            [self enableGesture];
 
-                // Check that animation successfully completed (wasn't interrupted by another gesture)
-                if (completed) {
+            // Check that animation successfully completed (wasn't interrupted by another gesture)
+            if (completed) {
 
-                    // Not interrupted, remove from super view and self
-                    [viewController.view removeFromSuperview];
-                    [viewController removeFromParentViewController];
-                    [self.topViewController viewDidAppear:YES];
-
-                }
-            };
-        }
+                // Not interrupted, remove from super view and self
+                [viewController.view removeFromSuperview];
+                [viewController removeFromParentViewController];
+                [self.topViewController viewDidAppear:YES];
+            }
+        }];
 
         // Add animation with key stackNav.dismiss so we know not to let the user navigate while it's dismissing
         [viewController.view.layer pop_addAnimation:springAnimation forKey:@"stackNav.dismiss"];
@@ -415,7 +411,7 @@
         // Update scale and opacity of previous vc animated
         [self updatePreviousViewWithOpacity:1 scale:1 animated:YES];
 
-    } else {
+    } else if (shouldPop) {
 
         if ([self shouldPopViewController:viewController animated:animated]) {
 
@@ -468,7 +464,7 @@
         CGPoint gestureLocationInViewController = [gesture locationInView:viewController.view];
 
         // <PCStackViewController> has navigationHandle, ensure gesture is within its bounds. If not, gestureIsNavigation = false
-        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle.frame]) {
+        if (![self point:gestureLocationInViewController isWithinBounds:viewController.navigationHandle]) {
             gestureIsNavigational = false;
         }
 
@@ -509,7 +505,7 @@
 
     if (self.childViewControllers.count > 1 && ![self.topViewController.view.layer pop_animationForKey:@"stackNav.navigate"]) {
 
-        UIViewController<PCStackViewController> *viewController = self.previousViewController;
+        UIViewController<PCStackViewController> *viewController = [self previousViewController];
 
         if (viewController) {
 
@@ -594,13 +590,21 @@
 }
 
 
+- (void)disableGesture {
+    self.panGestureRecognizer.enabled = false;
+}
+
+- (void)enableGesture {
+    self.panGestureRecognizer.enabled = true;
+}
+
 - (void)returnViewControllerToRestingCenter:(UIViewController <PCStackViewController> *)viewController completion:(void(^)())completion {
 
     // Find proper resting center
     CGPoint restingCenter = [self restingCenterForViewController:viewController];
 
     // Build animation
-    POPSpringAnimation *springReturnAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPosition];
+    POPSpringAnimation *springReturnAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
     springReturnAnimation.toValue = [NSValue valueWithCGPoint:restingCenter];
     springReturnAnimation.springBounciness = SPRING_BOUNCINESS;
     springReturnAnimation.springSpeed = SPRING_SPEED;
@@ -707,12 +711,34 @@
 
         // View controller underneath exists, use it to update status bar
         previousViewController = [self.childViewControllers objectAtIndex:previousViewControllerIndex];
-
     }
 
     return previousViewController;
 }
 
+#pragma mark animations
+
+- (POPSpringAnimation *)springCenterYAnimationWithVelocity:(CGFloat)velocity completion:(completion_block)completionBlock {
+    POPSpringAnimation *springAnimation = [POPSpringAnimation animationWithPropertyNamed:kPOPLayerPositionY];
+    springAnimation.springBounciness = SPRING_BOUNCINESS;
+    springAnimation.springSpeed = SPRING_SPEED;
+    springAnimation.velocity = @(velocity);
+    springAnimation.completionBlock = completionBlock;
+    return springAnimation;
+}
+
+- (POPSpringAnimation *)springEnterAnimationWithVelocity:(CGFloat)velocity viewController:(UIViewController<PCStackViewController> *)viewController completion:(completion_block)completionBlock {
+    POPSpringAnimation *springAnimation = [self springCenterYAnimationWithVelocity:velocity completion:completionBlock];
+    springAnimation.toValue = @([self restingCenterForViewController:viewController].y);
+    return springAnimation;
+}
+
+- (POPSpringAnimation *)springDismissAnimationWithVelocity:(CGFloat)velocity completion:(completion_block)completionBlock {
+    POPSpringAnimation *springAnimation = [self springCenterYAnimationWithVelocity:velocity completion:completionBlock];
+    springAnimation.toValue = @(self.view.frame.size.height * 1.5);
+    springAnimation.springBounciness = 0;
+    return springAnimation;
+}
 
 #pragma mark etc.
 
